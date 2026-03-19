@@ -128,7 +128,7 @@ export default function SettingsPage() {
             <FolderIcon sx={{ fontSize: 24, color: 'text.secondary' }} />
             <Box>
               <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                Uploaded Documents
+                Uploaded documents
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 Internal documents used for risk analysis
@@ -221,7 +221,7 @@ export default function SettingsPage() {
             <WebIcon sx={{ fontSize: 24, color: 'text.secondary' }} />
             <Box>
               <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                External Sources
+                External sources
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 Competitors, news, regulatory filings, and trend sources
@@ -234,7 +234,7 @@ export default function SettingsPage() {
             variant="outlined"
             onClick={() => setIsAddingSource(true)}
           >
-            Add Source
+            Add source
           </Button>
         </Stack>
 
@@ -242,7 +242,7 @@ export default function SettingsPage() {
         {isAddingSource && (
           <Paper variant="outlined" sx={{ p: 2, mb: 2, bgcolor: 'rgba(13, 17, 23, 0.5)' }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
-              Add New Source
+              Add new source
             </Typography>
             <Stack spacing={2}>
               <Stack direction="row" spacing={2}>

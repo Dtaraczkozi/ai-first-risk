@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, Suspense, useRef } from 'react';
+import { useState, useCallback, useEffect, Suspense, useRef, Fragment } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Box,
@@ -45,8 +45,6 @@ import {
   Add as AddIcon,
   Close as CloseIcon,
   Edit as EditIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
   Business as CompetitorIcon,
   Article as NewsIcon,
   TrendingUp as TrendIcon,
@@ -55,6 +53,14 @@ import {
   Lightbulb as NewRiskIcon,
   Folder as FolderIcon,
   InsertDriveFile as FileIcon,
+  OpenInNew as OpenInNewIcon,
+  FiberManualRecord as DotIcon,
+  Source as SourceIcon,
+  AccountBalance as AccountBalanceIcon,
+  MergeType as MergeIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
+  Send as SendIcon,
 } from '@mui/icons-material';
 import Link from 'next/link';
 import { DocumentUpload } from '@/components/agent/DocumentUpload';
@@ -68,20 +74,115 @@ import {
   analysisSteps,
   additionalMockRisks,
 } from '@/data/mock/analysis-session';
-import { getSeverityColor } from '@/lib/utils';
+import { getSeverityColor, RISK_CATEGORY_COLORS } from '@/lib/utils';
 import { addApprovedRisk, getApprovedRisks } from '@/lib/risk-store';
 
 type AppState = 'upload' | 'uploading' | 'analyzing' | 'review' | 'completed';
 
 const STORAGE_KEY = 'risk-discovery-state';
 
-const categoryColors: Record<string, string> = {
-  operational: '#0060C7',
-  compliance: '#9530DC',
-  financial: '#009999',
-  cyber: '#C42B31',
-  strategic: '#C29A1D',
+// ─── Mock intelligence signals (compact articles per source channel) ──────────
+interface Signal {
+  title: string;
+  source: string;
+  description: string;
+  relevance: 'high' | 'medium' | 'low';
+  url: string;
+  date: string;
+  riskCategories: string[];
+}
+
+const MOCK_SIGNALS: Record<'competitor' | 'news' | 'regulatory', Signal[]> = {
+  competitor: [
+    {
+      title: 'Competitor launches AI-driven risk scoring platform',
+      source: 'Competitor analysis Q1 2026',
+      description: 'A major industry player has deployed automated risk assessment tools, potentially shifting market expectations for risk management maturity.',
+      relevance: 'high',
+      url: 'https://competitor.example.com/reports/q1-2026',
+      date: 'Mar 14, 2026',
+      riskCategories: ['strategic', 'cyber'],
+    },
+    {
+      title: 'Key vendor consolidation affects supply chain',
+      source: 'Market intelligence',
+      description: 'Two top-tier vendors merged, concentrating dependency risk and potentially affecting SLA terms across the industry.',
+      relevance: 'medium',
+      url: 'https://competitor.example.com/vendor-watch',
+      date: 'Mar 10, 2026',
+      riskCategories: ['operational'],
+    },
+    {
+      title: 'Competitor expands into regulated APAC markets',
+      source: 'Industry intelligence',
+      description: 'Regional expansion increases competitive pressure in compliance-heavy jurisdictions, requiring enhanced regulatory posture.',
+      relevance: 'medium',
+      url: 'https://competitor.example.com/apac',
+      date: 'Mar 7, 2026',
+      riskCategories: ['compliance', 'strategic'],
+    },
+  ],
+  news: [
+    {
+      title: 'Ransomware campaigns targeting mid-size financial firms',
+      source: 'CyberSecurity Today',
+      description: 'A coordinated wave of attacks is exploiting unpatched legacy infrastructure in mid-tier financial institutions across North America.',
+      relevance: 'high',
+      url: 'https://news.example.com/ransomware-2026',
+      date: 'Mar 17, 2026',
+      riskCategories: ['cyber'],
+    },
+    {
+      title: 'Global supply chain disruptions extend into Q2',
+      source: 'Reuters industry watch',
+      description: 'Port delays and logistics bottlenecks driven by geopolitical tensions are expected to persist through mid-2026.',
+      relevance: 'high',
+      url: 'https://news.example.com/supply-chain-q2',
+      date: 'Mar 15, 2026',
+      riskCategories: ['operational', 'financial'],
+    },
+    {
+      title: 'Talent shortage in risk & compliance roles deepens',
+      source: 'HR compliance network',
+      description: 'The gap between skilled compliance professionals and demand has widened significantly, increasing key-person risk for understaffed teams.',
+      relevance: 'medium',
+      url: 'https://news.example.com/talent-shortage',
+      date: 'Mar 12, 2026',
+      riskCategories: ['strategic', 'operational'],
+    },
+  ],
+  regulatory: [
+    {
+      title: 'DORA compliance deadline approaching for EU operations',
+      source: 'European Commission',
+      description: 'The Digital Operational Resilience Act window closes Q3 2026. IT risk management and third-party oversight frameworks must be documented.',
+      relevance: 'high',
+      url: 'https://ec.europa.eu/dora',
+      date: 'Mar 16, 2026',
+      riskCategories: ['compliance', 'cyber', 'operational'],
+    },
+    {
+      title: 'SEC updates cybersecurity disclosure requirements',
+      source: 'SEC.gov',
+      description: 'New rules mandate granular disclosures on material cybersecurity incidents within 4 business days of determination.',
+      relevance: 'high',
+      url: 'https://sec.gov/cybersecurity-rules',
+      date: 'Mar 13, 2026',
+      riskCategories: ['compliance', 'cyber'],
+    },
+    {
+      title: 'GDPR enforcement actions increase 40% year-on-year',
+      source: 'EU Data Protection Board',
+      description: 'Regulators in Germany, France, and Ireland have significantly accelerated GDPR investigations and fine assessments.',
+      relevance: 'medium',
+      url: 'https://edpb.europa.eu/enforcement',
+      date: 'Mar 9, 2026',
+      riskCategories: ['compliance'],
+    },
+  ],
 };
+
+const categoryColors = RISK_CATEGORY_COLORS;
 
 const sourceTypeLabels: Record<string, string> = {
   document: 'Internal',
@@ -329,7 +430,7 @@ function RiskSummaryStats({ suggestions, approvedCount }: { suggestions: RiskSug
               {totalIdentified}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              Risks Identified
+              Risks identified
             </Typography>
           </Paper>
         </Grid>
@@ -339,7 +440,7 @@ function RiskSummaryStats({ suggestions, approvedCount }: { suggestions: RiskSug
               {pendingCount}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              Pending Review
+              Pending review
             </Typography>
           </Paper>
         </Grid>
@@ -366,6 +467,21 @@ function RiskSummaryStats({ suggestions, approvedCount }: { suggestions: RiskSug
       </Grid>
     </Box>
   );
+}
+
+const DUPLICATE_KEYWORDS = ['data breach', 'ransomware', 'vendor', 'gdpr'];
+
+function isDuplicate(title: string): boolean {
+  const lower = title.toLowerCase();
+  return DUPLICATE_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+function getConfidence(sources: DataSource[]): { label: string; color: 'success' | 'warning' | 'default' } {
+  const hasHighRelevance = sources.some(s => s.relevance === 'high');
+  const mediumCount = sources.filter(s => s.relevance === 'medium').length;
+  if (sources.length >= 2 && hasHighRelevance) return { label: 'High', color: 'success' };
+  if (sources.length >= 1 && (hasHighRelevance || mediumCount >= 2)) return { label: 'Medium', color: 'warning' };
+  return { label: 'Low', color: 'default' };
 }
 
 function RiskDiscoveryContent() {
@@ -395,8 +511,11 @@ function RiskDiscoveryContent() {
   const [activeFilters, setActiveFilters] = useState<Record<string, string | string[]>>({});
   const tableRef = useRef<HTMLDivElement>(null);
   const [visibleColumns, setVisibleColumns] = useState<string[]>(['risk', 'category', 'score', 'owner', 'sources', 'status', 'actions']);
-  const [sourcesExpanded, setSourcesExpanded] = useState(false);
   const [filterNewRisks, setFilterNewRisks] = useState(false);
+  const [sourcesDrawerOpen, setSourcesDrawerOpen] = useState(false);
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [surveysExpanded, setSurveysExpanded] = useState(true);
+  const [dismissedSurveys, setDismissedSurveys] = useState<Set<number>>(new Set());
 
   // Single source of truth for external source groups (used by section cards and table filter)
   const externalSourceGroups = [
@@ -685,6 +804,14 @@ function RiskDiscoveryContent() {
     setSuggestions(prev => prev.filter(s => s.id !== id));
   };
 
+  const handleBatchApprove = () => {
+    const pending = suggestions.filter(s => s.status === 'pending');
+    pending.forEach(risk => addApprovedRisk(risk));
+    setSuggestions(prev => prev.filter(s => s.status !== 'pending'));
+    setApprovedCount(prev => prev + pending.length);
+    setToast({ open: true, message: `${pending.length} risks approved and added to register` });
+  };
+
   const handleAddManualRisk = (risk: RiskSuggestion) => {
     setSuggestions(prev => [...prev, risk]);
     if (appState === 'upload') {
@@ -745,14 +872,14 @@ function RiskDiscoveryContent() {
             onClick={handleNewIdentification}
             disabled={isProcessing || showUploadUI}
           >
-            New Identification
+            New identification
           </Button>
           <Button
             variant="outlined"
             startIcon={<AddIcon />}
             onClick={() => setSideSheetOpen(true)}
           >
-            Add Manually
+            Add manually
           </Button>
         </Stack>
       </Stack>
@@ -896,7 +1023,7 @@ function RiskDiscoveryContent() {
                           size="small"
                           label={source.name}
                           variant="outlined"
-                          sx={{ height: 20, fontSize: 10 }}
+                          sx={{ height: 20, fontSize: 12 }}
                         />
                       ))}
                     </Stack>
@@ -928,173 +1055,32 @@ function RiskDiscoveryContent() {
 
             <RiskSummaryStats suggestions={suggestions} approvedCount={approvedCount} />
 
-            {/* Intelligence Overview Section */}
-            <Typography variant="h6" component="h3" sx={{ fontWeight: 600, mb: 1.5, mt: 1 }}>
-              Intelligence overview
-            </Typography>
-            {dataSources.length > 0 && (
-              <Paper 
-                variant="outlined"
-                sx={{ 
-                  mb: 2, 
-                  overflow: 'hidden',
-                  p: 3,
-                }}
-              >
-                <Box 
-                  sx={{ 
-                    cursor: 'pointer',
-                  }}
-                  onClick={() => {
-                    if (sourcesExpanded) {
-                      setSourcesExpanded(false);
-                      setFilterNewRisks(false);
-                    } else {
-                      setSourcesExpanded(true);
-                    }
-                  }}
-                >
-                  <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                    <Box sx={{ flex: 1 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
-                        Emerging external risks
-                      </Typography>
-                      
-                      {/* Aggregated overview - always visible */}
-                      {(() => {
-                        const competitorRisks = suggestions.filter(s => s.sources?.some(src => src.type === 'competitor')).length;
-                        const newsRisks = suggestions.filter(s => s.sources?.some(src => src.type === 'news')).length;
-                        const regulatoryRisks = suggestions.filter(s => s.sources?.some(src => src.type === '10k_filing' || src.type === 'trend')).length;
-                        
-                        return (
-                          <Grid container spacing={2}>
-                            <Grid size={{ xs: 4 }}>
-                              <Stack spacing={0.5}>
-                                <Stack direction="row" spacing={0.75} alignItems="center">
-                                  <CompetitorIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                                  <Typography variant="caption" color="text.secondary">Competitors</Typography>
-                                </Stack>
-                                <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                                  {competitorRisks}
-                                </Typography>
-                              </Stack>
-                            </Grid>
-                            <Grid size={{ xs: 4 }}>
-                              <Stack spacing={0.5}>
-                                <Stack direction="row" spacing={0.75} alignItems="center">
-                                  <NewsIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                                  <Typography variant="caption" color="text.secondary">News</Typography>
-                                </Stack>
-                                <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                                  {newsRisks}
-                                </Typography>
-                              </Stack>
-                            </Grid>
-                            <Grid size={{ xs: 4 }}>
-                              <Stack spacing={0.5}>
-                                <Stack direction="row" spacing={0.75} alignItems="center">
-                                  <RegulatoryIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                                  <Typography variant="caption" color="text.secondary">Regulatory</Typography>
-                                </Stack>
-                                <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                                  {regulatoryRisks}
-                                </Typography>
-                              </Stack>
-                            </Grid>
-                          </Grid>
-                        );
-                      })()}
-                    </Box>
-                    <IconButton size="small" sx={{ ml: 1 }}>
-                      {sourcesExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                    </IconButton>
-                  </Stack>
-                </Box>
-                
-                <Collapse in={sourcesExpanded}>
-                  <Box sx={{ mt: 3 }}>
-                  {/* Expanded details - source group list */}
-                  {(() => {
-                    const externalRisks = suggestions.filter(s => s.sources?.some(src => src.type !== 'document'));
-                    const sourceGroupLabels: Record<string, { label: string; icon: React.ReactNode }> = {
-                      competitor: { label: 'Competitor intelligence', icon: <CompetitorIcon sx={{ fontSize: 18, color: 'text.secondary' }} /> },
-                      news: { label: 'News & media', icon: <NewsIcon sx={{ fontSize: 18, color: 'text.secondary' }} /> },
-                      regulatory: { label: 'Regulatory & market trends', icon: <RegulatoryIcon sx={{ fontSize: 18, color: 'text.secondary' }} /> },
-                    };
-                    const sourceGroups = externalSourceGroups.map(group => ({
-                      ...group,
-                      ...sourceGroupLabels[group.key],
-                    }));
-                    
-                    const groupedRisks = sourceGroups.map(group => ({
-                      ...group,
-                      risks: externalRisks.filter(r => r.sources?.some(s => (group.types as readonly string[]).includes(s.type))),
-                    })).filter(g => g.risks.length > 0);
-                    
-                    if (groupedRisks.length === 0) {
-                      return (
-                        <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
-                          No risks from external sources yet. External sources are continuously monitored.
-                        </Typography>
-                      );
-                    }
-                    
-                    return (
-                      <Stack spacing={2}>
-                        {groupedRisks.map(({ key, types, label, icon, risks }, groupIdx) => {
-                          const isSelected = activeFilters.source === `external_${key}`;
-                          return (
-                          <Paper
-                            key={`external-source-${key}-${groupIdx}`}
-                            variant="outlined"
-                            sx={{
-                              p: 2,
-                              cursor: 'pointer',
-                              transition: 'all 0.2s',
-                              ...(isSelected && {
-                                bgcolor: 'rgba(96, 165, 250, 0.1)',
-                                borderColor: 'primary.main',
-                                borderWidth: 2,
-                              }),
-                              '&:hover': { 
-                                bgcolor: isSelected ? 'rgba(96, 165, 250, 0.1)' : 'rgba(96, 165, 250, 0.06)',
-                                borderColor: 'primary.main',
-                              },
-                            }}
-                            onClick={() => {
-                              setActiveFilters(prev => ({ ...prev, source: `external_${key}` }));
-                              setTimeout(() => {
-                                tableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                              }, 100);
-                            }}
-                          >
-                            <Stack direction="row" spacing={2} alignItems="center">
-                              {icon}
-                              <Box>
-                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                  {label}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  {risks.length} {risks.length === 1 ? 'risk' : 'risks'} identified
-                                </Typography>
-                              </Box>
-                            </Stack>
-                          </Paper>
-                          );
-                        })}
-                      </Stack>
-                    );
-                  })()}
-                  </Box>
-                </Collapse>
-              </Paper>
-            )}
-
             {/* Risk Suggestions Section */}
             <Box ref={tableRef}>
-              <Typography variant="h6" component="h3" sx={{ fontWeight: 600, mb: 1.5, mt: 2 }}>
-                Risk suggestions
-              </Typography>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5, mt: 1 }}>
+                <Typography variant="h6" component="h3" sx={{ fontWeight: 600 }}>
+                  Risk suggestions
+                </Typography>
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<SourceIcon />}
+                    onClick={() => setSourcesDrawerOpen(true)}
+                  >
+                    Sources
+                  </Button>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    startIcon={<AgentIcon />}
+                    onClick={handleBatchApprove}
+                    disabled={pendingSuggestions.length === 0}
+                  >
+                    Approve all ({pendingSuggestions.length})
+                  </Button>
+                </Stack>
+              </Stack>
             </Box>
 
             {/* Toolbar */}
@@ -1127,6 +1113,9 @@ function RiskDiscoveryContent() {
                 <TableHead>
                   <TableRow>
                     {visibleColumns.includes('risk') && <TableCell>Risk</TableCell>}
+                    <TableCell sx={{ width: 44, color: 'text.secondary' }}>Source</TableCell>
+                    <TableCell sx={{ color: 'text.secondary' }}>Confidence</TableCell>
+                    <TableCell sx={{ color: 'text.secondary' }}>Flag</TableCell>
                     {visibleColumns.includes('category') && <TableCell>Category</TableCell>}
                     {visibleColumns.includes('score') && <TableCell>Inherent score</TableCell>}
                     {visibleColumns.includes('owner') && <TableCell>Owner</TableCell>}
@@ -1204,6 +1193,9 @@ function RiskDiscoveryContent() {
                               <Skeleton variant="text" width="80%" height={24} />
                             </TableCell>
                           )}
+                          <TableCell><Skeleton variant="circular" width={20} height={20} /></TableCell>
+                          <TableCell><Skeleton variant="rounded" width={60} height={20} /></TableCell>
+                          <TableCell><Skeleton variant="rounded" width={60} height={20} /></TableCell>
                           {visibleColumns.includes('category') && (
                             <TableCell sx={{ minWidth: 120 }}>
                               <Skeleton variant="rounded" width={80} height={22} />
@@ -1250,311 +1242,475 @@ function RiskDiscoveryContent() {
                       );
                     }
                     
+                    const isExpanded = expandedRow === risk.id;
+                    const sourceType = risk.sources[0]?.type;
+                    const confidence = getConfidence(risk.sources);
+                    const duplicate = isDuplicate(risk.title);
+
+                    const sourceIcon = (() => {
+                      switch (sourceType) {
+                        case 'document': return <Tooltip title="Internal document"><IconButton size="small" disableRipple sx={{ p: 0, color: '#94a3b8' }}><DocumentIcon sx={{ fontSize: 16 }} /></IconButton></Tooltip>;
+                        case 'competitor': return <Tooltip title="Competitor intelligence"><IconButton size="small" disableRipple sx={{ p: 0, color: '#94a3b8' }}><CompetitorIcon sx={{ fontSize: 16 }} /></IconButton></Tooltip>;
+                        case '10k_filing': return <Tooltip title="10-K filing"><IconButton size="small" disableRipple sx={{ p: 0, color: '#94a3b8' }}><AccountBalanceIcon sx={{ fontSize: 16 }} /></IconButton></Tooltip>;
+                        case 'news': return <Tooltip title="News"><IconButton size="small" disableRipple sx={{ p: 0, color: '#94a3b8' }}><NewsIcon sx={{ fontSize: 16 }} /></IconButton></Tooltip>;
+                        case 'trend': return <Tooltip title="Market trend"><IconButton size="small" disableRipple sx={{ p: 0, color: '#94a3b8' }}><TrendIcon sx={{ fontSize: 16 }} /></IconButton></Tooltip>;
+                        default: return null;
+                      }
+                    })();
+
                     return (
-                      <TableRow key={risk.id} hover>
-                        {visibleColumns.includes('risk') && (
-                          <TableCell sx={{ minWidth: 200 }}>
-                            {editingTitleId === risk.id ? (
-                              <TextField
-                                value={risk.title}
-                                onChange={(e) => updateRisk(risk.id, { title: e.target.value })}
-                                onBlur={() => setEditingTitleId(null)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter' || e.key === 'Escape') {
-                                    setEditingTitleId(null);
-                                  }
-                                }}
-                                variant="standard"
-                                fullWidth
-                                size="small"
-                                autoFocus
-                                InputProps={{
-                                  disableUnderline: true,
-                                }}
-                                sx={{
-                                  '& .MuiInputBase-input': {
-                                    py: 0.5,
-                                    px: 0.5,
-                                    fontWeight: 600,
-                                    fontSize: '0.875rem',
-                                    bgcolor: 'rgba(30, 40, 60, 0.8)',
-                                    borderRadius: 0.5,
-                                  },
-                                }}
-                              />
-                            ) : (
-                              <Stack 
-                                direction="row" 
-                                alignItems="center" 
-                                spacing={0.5}
-                                sx={{
-                                  '& .edit-icon': {
-                                    opacity: 0,
-                                    transition: 'opacity 0.2s',
-                                  },
-                                  '&:hover .edit-icon': {
-                                    opacity: 1,
-                                  },
-                                }}
-                              >
-                                <Typography
-                                  component={Link}
-                                  href={`/risks/${risk.id}`}
-                                  variant="body2"
+                      <Fragment key={risk.id}>
+                        <TableRow
+                          hover
+                          onClick={() => setExpandedRow(isExpanded ? null : risk.id)}
+                          sx={{ cursor: 'pointer' }}
+                        >
+                          {visibleColumns.includes('risk') && (
+                            <TableCell sx={{ minWidth: 200 }}>
+                              {editingTitleId === risk.id ? (
+                                <TextField
+                                  value={risk.title}
+                                  onChange={(e) => updateRisk(risk.id, { title: e.target.value })}
+                                  onBlur={() => setEditingTitleId(null)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === 'Escape') {
+                                      setEditingTitleId(null);
+                                    }
+                                  }}
+                                  variant="standard"
+                                  fullWidth
+                                  size="small"
+                                  autoFocus
+                                  InputProps={{ disableUnderline: true }}
+                                  onClick={(e) => e.stopPropagation()}
                                   sx={{
-                                    fontWeight: 600,
-                                    color: 'text.primary',
-                                    textDecoration: 'underline',
-                                    '&:hover': {
-                                      color: 'primary.main',
+                                    '& .MuiInputBase-input': {
+                                      py: 0.5, px: 0.5, fontWeight: 600, fontSize: '0.875rem',
+                                      bgcolor: 'rgba(30, 40, 60, 0.8)', borderRadius: 0.5,
                                     },
                                   }}
-                                >
-                                  {risk.title}
-                                </Typography>
-                                <IconButton
-                                  className="edit-icon"
-                                  size="small"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    setEditingTitleId(risk.id);
-                                  }}
-                                  sx={{ 
-                                    p: 0.25,
-                                    ml: 0.5,
+                                />
+                              ) : (
+                                <Stack
+                                  direction="row"
+                                  alignItems="center"
+                                  spacing={0.5}
+                                  sx={{
+                                    '& .edit-icon': { opacity: 0, transition: 'opacity 0.2s' },
+                                    '&:hover .edit-icon': { opacity: 1 },
                                   }}
                                 >
-                                  <EditIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
-                                </IconButton>
-                              </Stack>
-                            )}
-                          </TableCell>
-                        )}
-                        {visibleColumns.includes('category') && (
-                          <TableCell sx={{ minWidth: 130 }}>
-                          <Select
-                            value={risk.category}
-                            onChange={(e) => updateRisk(risk.id, { category: e.target.value })}
-                            variant="outlined"
-                            size="small"
-                            fullWidth
-                            sx={{
-                              borderRadius: 2,
-                              '& .MuiOutlinedInput-notchedOutline': { borderColor: 'grey.300' },
-                              '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'grey.400' },
-                              '& .MuiSelect-select': {
-                                py: 1,
-                                px: 1.5,
-                                display: 'flex',
-                                alignItems: 'center',
-                              },
-                            }}
-                            renderValue={(value) => (
-                              <Typography variant="body2" sx={{ textTransform: 'capitalize' }}>
-                                {value}
-                              </Typography>
-                            )}
-                          >
-                            {categories.map((cat, catIdx) => (
-                              <MenuItem key={`cat-${catIdx}-${cat}`} value={cat} sx={{ textTransform: 'capitalize', fontSize: '0.875rem' }}>
-                                {cat}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                          </TableCell>
-                        )}
-                        {visibleColumns.includes('score') && (
-                          <TableCell sx={{ minWidth: 140 }}>
-                            <Select
-                              value={inherentScore}
-                              onChange={(e) => {
-                                const newScore = e.target.value as number;
-                                updateRisk(risk.id, { 
-                                  likelihood: newScore as 1 | 2 | 3 | 4 | 5, 
-                                  impact: newScore as 1 | 2 | 3 | 4 | 5 
-                                });
-                              }}
-                              variant="outlined"
-                              size="small"
-                              fullWidth
-                              sx={{
-                                borderRadius: 2,
-                                '& .MuiOutlinedInput-notchedOutline': { borderColor: 'grey.300' },
-                                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'grey.400' },
-                                '& .MuiSelect-select': {
-                                  py: 1,
-                                  px: 1.5,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                },
-                              }}
-                              renderValue={(value) => (
-                                <Stack direction="row" spacing={1} alignItems="center">
-                                  <Box
+                                  <Typography
+                                    component={Link}
+                                    href={`/risks/${risk.id}`}
+                                    variant="body2"
+                                    onClick={(e) => e.stopPropagation()}
                                     sx={{
-                                      width: 14,
-                                      height: 14,
-                                      borderRadius: 0.5,
-                                      bgcolor: getSeverityColor(value as number),
-                                      flexShrink: 0,
+                                      fontWeight: 600, color: 'text.primary', textDecoration: 'underline',
+                                      '&:hover': { color: 'primary.main' },
                                     }}
-                                  />
-                                  <Typography variant="body2">
-                                    {scoreOptions.find(s => s.value === value)?.label}
+                                  >
+                                    {risk.title}
                                   </Typography>
+                                  <IconButton
+                                    className="edit-icon"
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setEditingTitleId(risk.id);
+                                    }}
+                                    sx={{ p: 0.25, ml: 0.5 }}
+                                  >
+                                    <EditIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                                  </IconButton>
                                 </Stack>
                               )}
-                            >
-                              {scoreOptions.map((option, scoreOptIdx) => (
-                                <MenuItem key={`score-${option.value}-${scoreOptIdx}`} value={option.value}>
-                                  <Stack direction="row" spacing={1} alignItems="center">
-                                    <Box
-                                      sx={{
-                                        width: 14,
-                                        height: 14,
-                                        borderRadius: 0.5,
-                                        bgcolor: getSeverityColor(option.value),
-                                      }}
-                                    />
-                                    <Typography variant="body2">
-                                      {option.label}
-                                    </Typography>
-                                  </Stack>
-                                </MenuItem>
-                              ))}
-                            </Select>
+                            </TableCell>
+                          )}
+                          <TableCell sx={{ width: 44 }}>{sourceIcon}</TableCell>
+                          <TableCell>
+                            <Chip
+                              size="small"
+                              label={confidence.label}
+                              variant="outlined"
+                              color={confidence.color}
+                              sx={{ height: 20, fontSize: '0.75rem' }}
+                            />
                           </TableCell>
-                        )}
-                        {visibleColumns.includes('owner') && (
-                          <TableCell sx={{ minWidth: 180 }}>
-                          <Select
-                            value={risk.suggestedOwner?.name || ''}
-                            onChange={(e) => {
-                              const owner = availableOwners.find(o => o.name === e.target.value);
-                              if (owner) {
-                                updateRisk(risk.id, { suggestedOwner: owner });
-                              }
-                            }}
-                            variant="outlined"
-                            size="small"
-                            fullWidth
-                            displayEmpty
-                            sx={{
-                              borderRadius: 2,
-                              '& .MuiOutlinedInput-notchedOutline': { borderColor: 'grey.300' },
-                              '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'grey.400' },
-                              '& .MuiSelect-select': {
-                                py: 1,
-                                px: 1.5,
-                                display: 'flex',
-                                alignItems: 'center',
-                              },
-                            }}
-                            renderValue={(value) => {
-                              if (!value) return <Typography variant="body2" color="text.secondary">Select owner</Typography>;
-                              return (
-                                <Stack direction="row" spacing={1} alignItems="center">
-                                  <Avatar sx={{ width: 20, height: 20, fontSize: 10, bgcolor: getOwnerColor(value as string) }}>
-                                    {(value as string).charAt(0)}
-                                  </Avatar>
-                                  <Typography variant="body2">{value}</Typography>
-                                </Stack>
-                              );
-                            }}
-                          >
-                            {availableOwners.map((owner, ownerIdx) => (
-                              <MenuItem key={`owner-${ownerIdx}-${owner.name}`} value={owner.name}>
-                                <Stack direction="row" spacing={1} alignItems="center">
-                                  <Avatar sx={{ width: 24, height: 24, fontSize: 11, bgcolor: getOwnerColor(owner.name) }}>
-                                    {owner.name.charAt(0)}
-                                  </Avatar>
+                          <TableCell>
+                            {duplicate && (
+                              <Chip size="small" label="DUPLICATE" color="warning" variant="outlined" sx={{ height: 20, fontSize: '0.7rem' }} />
+                            )}
+                          </TableCell>
+                          {visibleColumns.includes('category') && (
+                            <TableCell sx={{ minWidth: 130 }}>
+                              <Select
+                                value={risk.category}
+                                onChange={(e) => updateRisk(risk.id, { category: e.target.value })}
+                                variant="outlined"
+                                size="small"
+                                fullWidth
+                                onClick={(e) => e.stopPropagation()}
+                                sx={{
+                                  borderRadius: 2,
+                                  '& .MuiOutlinedInput-notchedOutline': { borderColor: '#3b6aa8' },
+                                  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(96,165,250,0.65)' },
+                                  '& .MuiSelect-select': { py: 1, px: 1.5, display: 'flex', alignItems: 'center' },
+                                }}
+                                renderValue={(value) => (
+                                  <Typography variant="body2" sx={{ textTransform: 'capitalize' }}>{value}</Typography>
+                                )}
+                              >
+                                {categories.map((cat, catIdx) => (
+                                  <MenuItem key={`cat-${catIdx}-${cat}`} value={cat} sx={{ textTransform: 'capitalize', fontSize: '0.875rem' }}>
+                                    {cat}
+                                  </MenuItem>
+                                ))}
+                              </Select>
+                            </TableCell>
+                          )}
+                          {visibleColumns.includes('score') && (
+                            <TableCell sx={{ minWidth: 140 }}>
+                              <Select
+                                value={inherentScore}
+                                onChange={(e) => {
+                                  const newScore = e.target.value as number;
+                                  updateRisk(risk.id, {
+                                    likelihood: newScore as 1 | 2 | 3 | 4 | 5,
+                                    impact: newScore as 1 | 2 | 3 | 4 | 5,
+                                  });
+                                }}
+                                variant="outlined"
+                                size="small"
+                                fullWidth
+                                onClick={(e) => e.stopPropagation()}
+                                sx={{
+                                  borderRadius: 2,
+                                  '& .MuiOutlinedInput-notchedOutline': { borderColor: '#3b6aa8' },
+                                  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(96,165,250,0.65)' },
+                                  '& .MuiSelect-select': { py: 1, px: 1.5, display: 'flex', alignItems: 'center' },
+                                }}
+                                renderValue={(value) => (
+                                  <Stack direction="row" spacing={1} alignItems="center">
+                                    <Box sx={{ width: 14, height: 14, borderRadius: 0.5, bgcolor: getSeverityColor(value as number), flexShrink: 0 }} />
+                                    <Typography variant="body2">{scoreOptions.find(s => s.value === value)?.label}</Typography>
+                                  </Stack>
+                                )}
+                              >
+                                {scoreOptions.map((option, scoreOptIdx) => (
+                                  <MenuItem key={`score-${option.value}-${scoreOptIdx}`} value={option.value}>
+                                    <Stack direction="row" spacing={1} alignItems="center">
+                                      <Box sx={{ width: 14, height: 14, borderRadius: 0.5, bgcolor: getSeverityColor(option.value) }} />
+                                      <Typography variant="body2">{option.label}</Typography>
+                                    </Stack>
+                                  </MenuItem>
+                                ))}
+                              </Select>
+                            </TableCell>
+                          )}
+                          {visibleColumns.includes('owner') && (
+                            <TableCell sx={{ minWidth: 180 }}>
+                              <Select
+                                value={risk.suggestedOwner?.name || ''}
+                                onChange={(e) => {
+                                  const owner = availableOwners.find(o => o.name === e.target.value);
+                                  if (owner) updateRisk(risk.id, { suggestedOwner: owner });
+                                }}
+                                variant="outlined"
+                                size="small"
+                                fullWidth
+                                displayEmpty
+                                onClick={(e) => e.stopPropagation()}
+                                sx={{
+                                  borderRadius: 2,
+                                  '& .MuiOutlinedInput-notchedOutline': { borderColor: '#3b6aa8' },
+                                  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(96,165,250,0.65)' },
+                                  '& .MuiSelect-select': { py: 1, px: 1.5, display: 'flex', alignItems: 'center' },
+                                }}
+                                renderValue={(value) => {
+                                  if (!value) return <Typography variant="body2" color="text.secondary">Select owner</Typography>;
+                                  return (
+                                    <Stack direction="row" spacing={1} alignItems="center">
+                                      <Avatar sx={{ width: 20, height: 20, fontSize: 12, bgcolor: getOwnerColor(value as string) }}>
+                                        {(value as string).charAt(0)}
+                                      </Avatar>
+                                      <Typography variant="body2">{value}</Typography>
+                                    </Stack>
+                                  );
+                                }}
+                              >
+                                {availableOwners.map((owner, ownerIdx) => (
+                                  <MenuItem key={`owner-${ownerIdx}-${owner.name}`} value={owner.name}>
+                                    <Stack direction="row" spacing={1} alignItems="center">
+                                      <Avatar sx={{ width: 24, height: 24, fontSize: 12, bgcolor: getOwnerColor(owner.name) }}>
+                                        {owner.name.charAt(0)}
+                                      </Avatar>
+                                      <Box>
+                                        <Typography variant="body2">{owner.name}</Typography>
+                                        <Typography variant="caption" color="text.secondary">{owner.role}</Typography>
+                                      </Box>
+                                    </Stack>
+                                  </MenuItem>
+                                ))}
+                              </Select>
+                            </TableCell>
+                          )}
+                          {visibleColumns.includes('sources') && (
+                            <TableCell>
+                              <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                                {risk.sources.map((source, sourceIdx) => {
+                                  const chipLabel = source.type === 'document'
+                                    ? source.name
+                                    : sourceTypeLabels[source.type] || source.type;
+                                  return (
+                                    <Tooltip
+                                      key={`${risk.id}-source-${sourceIdx}`}
+                                      title={
+                                        <Box sx={{ whiteSpace: 'pre-line' }}>
+                                          <Typography variant="body2" sx={{ fontWeight: 600 }}>{source.name}</Typography>
+                                          {source.description && (
+                                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>{source.description}</Typography>
+                                          )}
+                                          {source.url && (
+                                            <Typography variant="caption" sx={{ color: 'primary.light', wordBreak: 'break-all', display: 'block', mt: 0.5 }}>{source.url}</Typography>
+                                          )}
+                                        </Box>
+                                      }
+                                      arrow
+                                    >
+                                      <Chip
+                                        size="small"
+                                        label={chipLabel}
+                                        variant="outlined"
+                                        sx={{ height: 20, fontSize: 12, maxWidth: 150 }}
+                                      />
+                                    </Tooltip>
+                                  );
+                                })}
+                              </Stack>
+                            </TableCell>
+                          )}
+                          {visibleColumns.includes('status') && (
+                            <TableCell>
+                              <Chip size="small" label="Draft" sx={{ height: 22, bgcolor: 'grey.200', color: 'grey.700' }} />
+                            </TableCell>
+                          )}
+                          {visibleColumns.includes('actions') && (
+                            <TableCell align="right" onClick={(e) => e.stopPropagation()}>
+                              <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                                {duplicate ? (
+                                  <Tooltip title="Merge">
+                                    <IconButton size="small" color="warning" onClick={() => handleApprove(risk.id)}>
+                                      <MergeIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                ) : (
+                                  <IconButton size="small" color="success" onClick={() => handleApprove(risk.id)} title="Approve">
+                                    <ApproveIcon fontSize="small" />
+                                  </IconButton>
+                                )}
+                                <IconButton size="small" color="error" onClick={() => handleReject(risk.id)} title="Reject">
+                                  <RejectIcon fontSize="small" />
+                                </IconButton>
+                              </Stack>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                        <TableRow>
+                          <TableCell colSpan={99} sx={{ p: 0, border: isExpanded ? undefined : 'none' }}>
+                            <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                              <Box sx={{ px: 3, py: 2, bgcolor: 'rgba(255,255,255,0.02)', borderBottom: '1px solid', borderColor: 'divider' }}>
+                                <Stack spacing={1.5}>
                                   <Box>
-                                    <Typography variant="body2">{owner.name}</Typography>
-                                    <Typography variant="caption" color="text.secondary">{owner.role}</Typography>
+                                    <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                      Agent reasoning
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ mt: 0.5, color: 'text.secondary' }}>
+                                      {risk.reasoning}
+                                    </Typography>
+                                  </Box>
+                                  {risk.sources.length > 0 && (
+                                    <Box>
+                                      <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                        Sources
+                                      </Typography>
+                                      <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
+                                        {risk.sources.map((src, i) => (
+                                          <Chip key={i} size="small" label={src.name} variant="outlined" sx={{ height: 20, fontSize: '0.75rem' }} />
+                                        ))}
+                                      </Stack>
+                                    </Box>
+                                  )}
+                                  <Box>
+                                    <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                      Suggested inherent
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ mt: 0.5, color: 'text.secondary' }}>
+                                      L:{risk.likelihood} × I:{risk.impact} &mdash; Based on historical incidents and KRI signals
+                                    </Typography>
                                   </Box>
                                 </Stack>
-                              </MenuItem>
-                            ))}
-                          </Select>
+                              </Box>
+                            </Collapse>
                           </TableCell>
-                        )}
-                        {visibleColumns.includes('sources') && (
-                          <TableCell>
-                            <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-                              {risk.sources.map((source, sourceIdx) => {
-                                const chipLabel = source.type === 'document' 
-                                  ? source.name 
-                                  : sourceTypeLabels[source.type] || source.type;
-                                return (
-                                  <Tooltip 
-                                    key={`${risk.id}-source-${sourceIdx}`} 
-                                    title={
-                                      <Box sx={{ whiteSpace: 'pre-line' }}>
-                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                          {source.name}
-                                        </Typography>
-                                        {source.description && (
-                                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                                            {source.description}
-                                          </Typography>
-                                        )}
-                                        {source.url && (
-                                          <Typography variant="caption" sx={{ color: 'primary.light', wordBreak: 'break-all', display: 'block', mt: 0.5 }}>
-                                            {source.url}
-                                          </Typography>
-                                        )}
-                                      </Box>
-                                    } 
-                                    arrow
-                                  >
-                                    <Chip
-                                      size="small"
-                                      label={chipLabel}
-                                      variant="outlined"
-                                      sx={{ height: 20, fontSize: 10, maxWidth: 150 }}
-                                    />
-                                  </Tooltip>
-                                );
-                              })}
-                            </Stack>
-                          </TableCell>
-                        )}
-                        {visibleColumns.includes('status') && (
-                          <TableCell>
-                            <Chip size="small" label="Draft" sx={{ height: 22, bgcolor: 'grey.200', color: 'grey.700' }} />
-                          </TableCell>
-                        )}
-                        {visibleColumns.includes('actions') && (
-                          <TableCell align="right">
-                            <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                              <IconButton
-                                size="small"
-                                color="success"
-                                onClick={() => handleApprove(risk.id)}
-                                title="Approve"
-                              >
-                                <ApproveIcon fontSize="small" />
-                              </IconButton>
-                              <IconButton
-                                size="small"
-                                color="error"
-                                onClick={() => handleReject(risk.id)}
-                                title="Reject"
-                              >
-                                <RejectIcon fontSize="small" />
-                              </IconButton>
-                            </Stack>
-                          </TableCell>
-                        )}
-                      </TableRow>
+                        </TableRow>
+                      </Fragment>
                     );
                   })}
                 </TableBody>
               </Table>
             </TableContainer>
+
+            {/* Surveys Section */}
+            {(appState === 'review' || appState === 'completed') && (
+              <Box sx={{ mt: 3 }}>
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  spacing={1}
+                  onClick={() => setSurveysExpanded(prev => !prev)}
+                  sx={{ cursor: 'pointer', mb: 1.5, userSelect: 'none' }}
+                >
+                  <Typography variant="h6" component="h3" sx={{ fontWeight: 600 }}>
+                    Agent-proposed identification surveys
+                  </Typography>
+                  <Chip size="small" label={2 - dismissedSurveys.size} sx={{ height: 20, fontSize: '0.75rem' }} />
+                  {surveysExpanded ? <ExpandLessIcon sx={{ color: 'text.secondary' }} /> : <ExpandMoreIcon sx={{ color: 'text.secondary' }} />}
+                </Stack>
+                <Collapse in={surveysExpanded}>
+                  <Stack spacing={2}>
+                    {[
+                      {
+                        idx: 0,
+                        title: 'Q1 Risk Identification Survey — IT & Security',
+                        recipients: 'IT Director, CISO, Head of Infrastructure (3 recipients)',
+                        scheduled: 'Mar 25, 2026 · Agent scheduled',
+                        questions: 8,
+                      },
+                      {
+                        idx: 1,
+                        title: 'Operational Risk Survey — Operations & Supply Chain',
+                        recipients: 'COO, VP Operations, Supply Chain Manager (3 recipients)',
+                        scheduled: 'Mar 28, 2026 · Agent scheduled',
+                        questions: 6,
+                      },
+                    ]
+                      .filter(s => !dismissedSurveys.has(s.idx))
+                      .map(survey => (
+                        <Paper key={survey.idx} variant="outlined" sx={{ p: 2.5 }}>
+                          <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1.5 }}>
+                            <Box>
+                              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{survey.title}</Typography>
+                                <Chip size="small" label="draft" variant="outlined" sx={{ height: 18, fontSize: '0.7rem' }} />
+                              </Stack>
+                              <Typography variant="body2" color="text.secondary">{survey.recipients}</Typography>
+                            </Box>
+                          </Stack>
+                          <Stack direction="row" spacing={2} sx={{ mb: 1.5 }}>
+                            <Typography variant="caption" color="text.secondary">
+                              <strong>Scheduled:</strong> {survey.scheduled}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              <strong>Questions:</strong> {survey.questions}
+                            </Typography>
+                          </Stack>
+                          <Stack direction="row" spacing={1}>
+                            <Button
+                              variant="contained"
+                              size="small"
+                              startIcon={<SendIcon />}
+                              onClick={() => setToast({ open: true, message: 'Survey approved and scheduled for sending' })}
+                            >
+                              Approve &amp; send
+                            </Button>
+                            <Button variant="outlined" size="small">Edit</Button>
+                            <Button
+                              variant="text"
+                              size="small"
+                              color="error"
+                              onClick={() => setDismissedSurveys(prev => new Set([...prev, survey.idx]))}
+                            >
+                              Discard
+                            </Button>
+                          </Stack>
+                        </Paper>
+                      ))}
+                  </Stack>
+                </Collapse>
+              </Box>
+            )}
         </Box>
       </Collapse>
+
+      {/* Sources Drawer */}
+      <Drawer
+        anchor="right"
+        open={sourcesDrawerOpen}
+        onClose={() => setSourcesDrawerOpen(false)}
+        PaperProps={{ sx: { width: 480, p: 3 } }}
+      >
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>Intelligence Sources</Typography>
+          <IconButton onClick={() => setSourcesDrawerOpen(false)} size="small"><CloseIcon /></IconButton>
+        </Stack>
+        <Box sx={{ overflow: 'auto' }}>
+          {(Object.entries(MOCK_SIGNALS) as [keyof typeof MOCK_SIGNALS, typeof MOCK_SIGNALS[keyof typeof MOCK_SIGNALS]][]).map(([channelKey, signals]) => {
+            const channelMeta: Record<string, { label: string; accentColor: string }> = {
+              competitor: { label: 'Competitor intelligence', accentColor: '#9530DC' },
+              news: { label: 'News & media', accentColor: '#0060C7' },
+              regulatory: { label: 'Regulatory & market trends', accentColor: '#C29A1D' },
+            };
+            const meta = channelMeta[channelKey];
+            const relevanceColor: Record<string, string> = { high: '#E54E54', medium: '#C29A1D', low: '#2EB365' };
+            return (
+              <Box key={channelKey} sx={{ mb: 3 }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: meta.accentColor, textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', mb: 1 }}>
+                  {meta.label}
+                </Typography>
+                <Stack spacing={1}>
+                  {signals.map((sig, i) => (
+                    <Paper key={i} variant="outlined" sx={{ p: 1.5 }}>
+                      <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 0.5 }}>
+                        <Stack direction="row" spacing={1} alignItems="center" sx={{ flex: 1, minWidth: 0 }}>
+                          <Chip
+                            size="small"
+                            label={channelKey}
+                            sx={{ height: 16, fontSize: '0.7rem', bgcolor: `${meta.accentColor}18`, color: meta.accentColor, border: `1px solid ${meta.accentColor}40`, flexShrink: 0 }}
+                          />
+                          <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.3 }}>{sig.title}</Typography>
+                        </Stack>
+                        <IconButton
+                          component="a"
+                          href={sig.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          size="small"
+                          sx={{ p: 0.25, color: 'text.disabled', flexShrink: 0, '&:hover': { color: meta.accentColor } }}
+                        >
+                          <OpenInNewIcon sx={{ fontSize: 14 }} />
+                        </IconButton>
+                      </Stack>
+                      <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mb: 0.5 }}>
+                        {sig.source} · {sig.date}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75, lineHeight: 1.5 }}>
+                        {sig.description}
+                      </Typography>
+                      <Chip
+                        size="small"
+                        label={sig.relevance}
+                        sx={{ height: 16, fontSize: '0.7rem', bgcolor: `${relevanceColor[sig.relevance]}18`, color: relevanceColor[sig.relevance], border: `1px solid ${relevanceColor[sig.relevance]}40` }}
+                      />
+                    </Paper>
+                  ))}
+                </Stack>
+              </Box>
+            );
+          })}
+        </Box>
+      </Drawer>
 
       <Snackbar
         open={toast.open}

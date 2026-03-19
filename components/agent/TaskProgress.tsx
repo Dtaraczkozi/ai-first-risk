@@ -33,17 +33,17 @@ const taskTypeIcons: Record<AgentTaskType, React.ReactNode> = {
 };
 
 const taskTypeLabels: Record<AgentTaskType, string> = {
-  identify: 'Risk Identification',
-  assess: 'Risk Assessment',
-  suggest_controls: 'Control Suggestion',
+  identify: 'Risk identification',
+  assess: 'Risk assessment',
+  suggest_controls: 'Control suggestion',
   monitor: 'Monitoring',
-  report: 'Report Generation',
+  report: 'Report generation',
 };
 
 const statusConfig: Record<AgentTaskStatus, { color: 'default' | 'primary' | 'warning' | 'success' | 'error'; label: string; icon: React.ReactElement | undefined }> = {
   queued: { color: 'default', label: 'Queued', icon: <PendingIcon fontSize="small" /> },
   running: { color: 'primary', label: 'Running', icon: undefined },
-  awaiting_approval: { color: 'warning', label: 'Awaiting Approval', icon: <PendingIcon fontSize="small" /> },
+  awaiting_approval: { color: 'warning', label: 'Awaiting approval', icon: <PendingIcon fontSize="small" /> },
   completed: { color: 'success', label: 'Completed', icon: <CompletedIcon fontSize="small" /> },
   failed: { color: 'error', label: 'Failed', icon: <ErrorIcon fontSize="small" /> },
 };

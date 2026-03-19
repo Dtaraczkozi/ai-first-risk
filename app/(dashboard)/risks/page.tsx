@@ -24,19 +24,15 @@ import {
 } from '@mui/icons-material';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import Link from 'next/link';
-import { getSeverityColor } from '@/lib/utils';
+import { getSeverityColor, getScoreColor, getScoreLabel as getScoreLabelUtil, RISK_CATEGORY_COLORS, getRiskDisplayId } from '@/lib/utils';
 import { getApprovedRisks, seedMockRisks } from '@/lib/risk-store';
+import { getKRIs } from '@/lib/kri-store';
 import { TableToolbar } from '@/components/TableToolbar';
 import { HeatmapSidesheet, type SelectedCell } from '@/components/risks/HeatmapSidesheet';
 import type { RiskSuggestion } from '@/types/document';
+import type { KeyRiskIndicator } from '@/types/kri';
 
-const categoryColors: Record<string, string> = {
-  operational: '#0060C7',
-  compliance: '#9530DC',
-  financial: '#009999',
-  cyber: '#C42B31',
-  strategic: '#C29A1D',
-};
+const categoryColors = RISK_CATEGORY_COLORS;
 
 const ragColors = {
   positive: { 3: '#2EB365', 4: '#7ECDA0' },
@@ -55,6 +51,26 @@ const ownerColors: Record<string, string> = {
 const getOwnerColor = (name: string): string => {
   return ownerColors[name] || '#6B7280';
 };
+
+function deriveResiduals(risk: RiskSuggestion) {
+  const inherentScore = (risk.likelihood + risk.impact) / 2;
+  const seed = risk.id.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+  let treatment: string;
+  if (inherentScore >= 4) treatment = 'mitigate';
+  else if (inherentScore >= 3) treatment = seed % 3 === 0 ? 'transfer' : seed % 3 === 1 ? 'mitigate' : 'accept';
+  else treatment = seed % 2 === 0 ? 'accept' : 'mitigate';
+  const maxReduction = inherentScore - 1;
+  const rawReduction =
+    treatment === 'mitigate' ? Math.min(1.3 + (seed % 8) * 0.1, maxReduction) :
+    treatment === 'avoid'    ? Math.min(1.8, maxReduction) :
+    treatment === 'transfer' ? Math.min(0.8, maxReduction) : 0;
+  const residualScore = Math.max(1, inherentScore - rawReduction);
+  const ratio = inherentScore > 0 ? residualScore / inherentScore : 1;
+  const residualL = Math.max(1, Math.round(risk.likelihood * ratio * 10) / 10);
+  const residualI = Math.max(1, Math.round(risk.impact * ratio * 10) / 10);
+  const reductionPct = inherentScore > 0 ? Math.round(((inherentScore - residualScore) / inherentScore) * 100) : 0;
+  return { residualScore, residualL, residualI, reductionPct };
+}
 
 function RiskVisualizations({ risks, onCellClick }: { risks: RiskSuggestion[]; onCellClick: (cell: SelectedCell) => void }) {
   if (risks.length === 0) return null;
@@ -112,13 +128,14 @@ function RiskVisualizations({ risks, onCellClick }: { risks: RiskSuggestion[]; o
                       outerRadius={60}
                       paddingAngle={2}
                       dataKey="value"
+                      stroke="none"
                     >
                       {Object.entries(categoryCount).map(([name], index) => (
                         <Cell key={`cell-${index}`} fill={categoryColors[name] || '#6B7280'} />
                       ))}
                     </Pie>
                     <RechartsTooltip
-                      formatter={(value: number | undefined) => [`${value ?? 0} risks`, '']}
+                      formatter={(value: unknown) => [`${(value as number) ?? 0} risks`, '']}
                       contentStyle={{
                         borderRadius: 8,
                         border: '1px solid rgba(96, 165, 250, 0.2)',
@@ -144,7 +161,7 @@ function RiskVisualizations({ risks, onCellClick }: { risks: RiskSuggestion[]; o
                   <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1 }}>
                     {risks.length}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: 12 }}>
                     Risks
                   </Typography>
                 </Box>
@@ -183,7 +200,7 @@ function RiskVisualizations({ risks, onCellClick }: { risks: RiskSuggestion[]; o
                   variant="caption" 
                   color="text.secondary" 
                   sx={{ 
-                    fontSize: 10, 
+                    fontSize: 12, 
                     writingMode: 'vertical-rl',
                     transform: 'rotate(180deg)',
                   }}
@@ -195,7 +212,7 @@ function RiskVisualizations({ risks, onCellClick }: { risks: RiskSuggestion[]; o
                 <Box sx={{ display: 'flex', flex: 1 }}>
                   <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-around', pr: 0.5, width: 16 }}>
                     {[5, 4, 3, 2, 1].map(l => (
-                      <Typography key={l} variant="caption" color="text.secondary" sx={{ fontSize: 10, textAlign: 'right' }}>
+                      <Typography key={l} variant="caption" color="text.secondary" sx={{ fontSize: 12, textAlign: 'right' }}>
                         {l}
                       </Typography>
                     ))}
@@ -211,12 +228,12 @@ function RiskVisualizations({ risks, onCellClick }: { risks: RiskSuggestion[]; o
                               L{likelihood} × I{impact} ({count} {count === 1 ? 'risk' : 'risks'})
                             </Typography>
                             {cellRisks.slice(0, 5).map((risk, idx) => (
-                              <Typography key={risk.id} variant="caption" sx={{ display: 'block', fontSize: 11 }}>
+                              <Typography key={risk.id} variant="caption" sx={{ display: 'block', fontSize: 12 }}>
                                 • {risk.title}
                               </Typography>
                             ))}
                             {count > 5 && (
-                              <Typography variant="caption" sx={{ display: 'block', fontSize: 11, fontStyle: 'italic', mt: 0.5 }}>
+                              <Typography variant="caption" sx={{ display: 'block', fontSize: 12, fontStyle: 'italic', mt: 0.5 }}>
                                 +{count - 5} more...
                               </Typography>
                             )}
@@ -256,7 +273,7 @@ function RiskVisualizations({ risks, onCellClick }: { risks: RiskSuggestion[]; o
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 cursor: count > 0 ? 'pointer' : 'default',
-                                border: count > 0 ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(255,255,255,0.04)',
+                                border: 'none',
                                 transition: 'transform 0.15s ease, box-shadow 0.15s ease',
                                 '&:hover': count > 0 ? {
                                   transform: 'scale(1.08)',
@@ -266,7 +283,7 @@ function RiskVisualizations({ risks, onCellClick }: { risks: RiskSuggestion[]; o
                               }}
                             >
                               {count > 0 && (
-                                <Typography variant="caption" sx={{ fontSize: 10, fontWeight: 700, color: 'white', textShadow: '0 1px 3px rgba(0,0,0,0.6)' }}>
+                                <Typography variant="caption" sx={{ fontSize: 12, fontWeight: 700, color: 'white', textShadow: '0 1px 3px rgba(0,0,0,0.6)' }}>
                                   {count}
                                 </Typography>
                               )}
@@ -280,13 +297,13 @@ function RiskVisualizations({ risks, onCellClick }: { risks: RiskSuggestion[]; o
                 <Box sx={{ display: 'flex', pl: 2.5 }}>
                   <Stack direction="row" justifyContent="space-around" sx={{ flex: 1, mt: 0.5 }}>
                     {[1, 2, 3, 4, 5].map(i => (
-                      <Typography key={i} variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>
+                      <Typography key={i} variant="caption" color="text.secondary" sx={{ fontSize: 12 }}>
                         {i}
                       </Typography>
                     ))}
                   </Stack>
                 </Box>
-                <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', fontSize: 10, mt: 0.5, pl: 2 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', fontSize: 12, mt: 0.5, pl: 2 }}>
                   Impact
                 </Typography>
               </Box>
@@ -313,13 +330,14 @@ function RiskVisualizations({ risks, onCellClick }: { risks: RiskSuggestion[]; o
                       outerRadius={60}
                       paddingAngle={2}
                       dataKey="value"
+                      stroke="none"
                     >
                       {Object.entries(statusCount).map(([status], index) => (
                         <Cell key={`status-${index}`} fill={statusColors[status]?.bg || '#6B7280'} />
                       ))}
                     </Pie>
                     <RechartsTooltip
-                      formatter={(value: number | undefined) => [`${value ?? 0} risks`, '']}
+                      formatter={(value: unknown) => [`${(value as number) ?? 0} risks`, '']}
                       contentStyle={{
                         borderRadius: 8,
                         border: '1px solid rgba(96, 165, 250, 0.2)',
@@ -390,23 +408,19 @@ const getAssessmentStatus = (risk: RiskSuggestion): string => {
 
 export default function RiskRegisterPage() {
   const [approvedRisks, setApprovedRisks] = useState<RiskSuggestion[]>([]);
+  const [kris, setKRIs] = useState<KeyRiskIndicator[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilters, setActiveFilters] = useState<Record<string, string | string[]>>({});
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(['risk', 'category', 'score', 'owner', 'status']);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(['risk', 'category', 'score', 'residual', 'owner', 'status']);
   const [selectedCell, setSelectedCell] = useState<SelectedCell | null>(null);
 
   useEffect(() => {
     seedMockRisks(50);
     setApprovedRisks(getApprovedRisks());
+    setKRIs(getKRIs());
   }, []);
 
-  const getScoreLabel = (score: number) => {
-    if (score >= 5) return 'Very high';
-    if (score >= 4) return 'High';
-    if (score >= 3) return 'Medium';
-    if (score >= 2) return 'Low';
-    return 'Very low';
-  };
+  const getScoreLabel = getScoreLabelUtil;
 
   const filterOptions = [
     {
@@ -430,11 +444,13 @@ export default function RiskRegisterPage() {
   ];
   
   const columnOptions = [
-    { id: 'risk', label: 'Risk' },
-    { id: 'category', label: 'Category' },
-    { id: 'score', label: 'Inherent score' },
-    { id: 'owner', label: 'Owner' },
-    { id: 'status', label: 'Status' },
+    { id: 'risk',        label: 'Risk' },
+    { id: 'category',    label: 'Category' },
+    { id: 'score',       label: 'Inherent score' },
+    { id: 'residual',    label: 'Residual score' },
+    { id: 'owner',       label: 'Owner' },
+    { id: 'status',      label: 'Status' },
+    { id: 'kri_signals', label: 'KRI signals' },
   ];
   
   const handleFilterChange = (filterId: string, value: string | string[]) => {
@@ -501,19 +517,46 @@ export default function RiskRegisterPage() {
               variant="contained"
               startIcon={<AgentIcon />}
             >
-              New Identification
+              New identification
             </Button>
             <Button
               variant="outlined"
               startIcon={<AddIcon />}
             >
-              Add Manually
+              Add manually
             </Button>
           </Stack>
         </Paper>
       ) : (
         <>
           <RiskVisualizations risks={approvedRisks} onCellClick={setSelectedCell} />
+
+          <Stack direction="row" justifyContent="flex-end" spacing={1} sx={{ mb: 1 }}>
+            <Button
+              component={Link}
+              href="/"
+              size="small"
+              variant="outlined"
+              startIcon={<AgentIcon sx={{ fontSize: '14px !important' }} />}
+              sx={{
+                fontSize: '0.75rem',
+                borderColor: '#3b82f6',
+                color: '#3b82f6',
+                '&:hover': { borderColor: '#3b82f6', bgcolor: 'rgba(59,130,246,0.08)' },
+              }}
+            >
+              Identify new risks
+            </Button>
+            <Button
+              component={Link}
+              href="/?new=true"
+              size="small"
+              variant="contained"
+              startIcon={<AgentIcon sx={{ fontSize: '14px !important' }} />}
+            >
+              Add risk
+            </Button>
+          </Stack>
 
           <TableToolbar
             searchTerm={searchTerm}
@@ -533,33 +576,35 @@ export default function RiskRegisterPage() {
           <TableContainer component={Paper} variant="outlined">
             <Table size="small">
               <TableHead>
-                <TableRow>
-                  {visibleColumns.includes('risk') && <TableCell>Risk</TableCell>}
+                <TableRow sx={{ '& .MuiTableCell-head': { fontWeight: 600, fontSize: '0.75rem', color: 'text.secondary' } }}>
+                  <TableCell sx={{ width: 80 }}>ID</TableCell>
+                  {visibleColumns.includes('risk')     && <TableCell>Risk</TableCell>}
                   {visibleColumns.includes('category') && <TableCell>Category</TableCell>}
-                  {visibleColumns.includes('score') && <TableCell>Inherent score</TableCell>}
-                  {visibleColumns.includes('owner') && <TableCell>Owner</TableCell>}
-                  {visibleColumns.includes('status') && <TableCell>Status</TableCell>}
+                  {visibleColumns.includes('score')    && <TableCell>Inherent score</TableCell>}
+                  {visibleColumns.includes('residual') && <TableCell>Residual score</TableCell>}
+                  {visibleColumns.includes('owner')       && <TableCell>Owner</TableCell>}
+                  {visibleColumns.includes('status')      && <TableCell>Status</TableCell>}
+                  {visibleColumns.includes('kri_signals') && <TableCell>KRI signals</TableCell>}
                 </TableRow>
               </TableHead>
               <TableBody>
                 {filteredRisks.map((risk) => {
-                  const inherentScore = Math.round((risk.likelihood + risk.impact) / 2);
+                  const inherentScore = (risk.likelihood + risk.impact) / 2;
+                  const res = deriveResiduals(risk);
                   return (
                     <TableRow key={risk.id} hover>
+                      <TableCell>
+                        <Typography variant="caption" sx={{ fontFamily: 'monospace', fontWeight: 700, color: 'text.secondary', letterSpacing: '0.02em' }}>
+                          {getRiskDisplayId(risk.id, approvedRisks)}
+                        </Typography>
+                      </TableCell>
                       {visibleColumns.includes('risk') && (
                         <TableCell>
                           <Typography
                             component={Link}
                             href={`/risks/${risk.id}`}
                             variant="body2"
-                            sx={{
-                              fontWeight: 700,
-                              color: 'text.primary',
-                              textDecoration: 'underline',
-                              '&:hover': {
-                                color: 'primary.main',
-                              },
-                            }}
+                            sx={{ fontWeight: 700, color: 'text.primary', textDecoration: 'none', '&:hover': { color: 'primary.main' } }}
                           >
                             {risk.title}
                           </Typography>
@@ -573,7 +618,6 @@ export default function RiskRegisterPage() {
                             variant="outlined"
                             sx={{
                               color: 'text.secondary',
-                              borderColor: 'grey.400',
                               textTransform: 'capitalize',
                               height: 22,
                             }}
@@ -583,20 +627,41 @@ export default function RiskRegisterPage() {
                       {visibleColumns.includes('score') && (
                         <TableCell>
                           <Stack direction="row" spacing={0.75} alignItems="center">
-                            <Box
-                              sx={{
-                                width: 10,
-                                height: 10,
-                                borderRadius: 0.5,
-                                bgcolor: getSeverityColor(inherentScore),
-                              }}
-                            />
-                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                              {inherentScore}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              {getScoreLabel(inherentScore)}
-                            </Typography>
+                            <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: getSeverityColor(inherentScore), flexShrink: 0 }} />
+                            <Stack>
+                              <Stack direction="row" spacing={0.5} alignItems="baseline">
+                                <Typography variant="body2" sx={{ fontWeight: 700, color: getSeverityColor(inherentScore) }}>
+                                  {inherentScore.toFixed(1)}
+                                </Typography>
+                                <Typography variant="caption" color="text.disabled">{getScoreLabel(inherentScore)}</Typography>
+                              </Stack>
+                              <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.75rem' }}>
+                                L{risk.likelihood} × I{risk.impact}
+                              </Typography>
+                            </Stack>
+                          </Stack>
+                        </TableCell>
+                      )}
+                      {visibleColumns.includes('residual') && (
+                        <TableCell>
+                          <Stack direction="row" spacing={0.75} alignItems="center">
+                            <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: getSeverityColor(res.residualScore), flexShrink: 0 }} />
+                            <Stack>
+                              <Stack direction="row" spacing={0.5} alignItems="baseline">
+                                <Typography variant="body2" sx={{ fontWeight: 700, color: getSeverityColor(res.residualScore) }}>
+                                  {res.residualScore.toFixed(1)}
+                                </Typography>
+                                <Typography variant="caption" color="text.disabled">{getScoreLabel(res.residualScore)}</Typography>
+                              </Stack>
+                              <Stack direction="row" spacing={0.75} alignItems="center">
+                                <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.75rem' }}>
+                                  L{res.residualL.toFixed(1)} × I{res.residualI.toFixed(1)}
+                                </Typography>
+                                {res.reductionPct > 0 && (
+                                  <Typography variant="caption" sx={{ color: '#2EB365', fontSize: '0.75rem' }}>−{res.reductionPct}%</Typography>
+                                )}
+                              </Stack>
+                            </Stack>
                           </Stack>
                         </TableCell>
                       )}
@@ -604,12 +669,10 @@ export default function RiskRegisterPage() {
                         <TableCell sx={{ whiteSpace: 'nowrap' }}>
                           {risk.suggestedOwner && (
                             <Stack direction="row" spacing={0.5} alignItems="center">
-                              <Avatar sx={{ width: 20, height: 20, fontSize: 10, bgcolor: getOwnerColor(risk.suggestedOwner.name) }}>
+                              <Avatar sx={{ width: 20, height: 20, fontSize: 12, bgcolor: getOwnerColor(risk.suggestedOwner.name) }}>
                                 {risk.suggestedOwner.name.charAt(0)}
                               </Avatar>
-                              <Typography variant="body2">
-                                {risk.suggestedOwner.name}
-                              </Typography>
+                              <Typography variant="body2">{risk.suggestedOwner.name}</Typography>
                             </Stack>
                           )}
                         </TableCell>
@@ -621,19 +684,62 @@ export default function RiskRegisterPage() {
                             const colors = statusColors[status];
                             const label = statusOptions.find(s => s.value === status)?.label || status;
                             return (
-                              <Chip 
-                                size="small" 
-                                label={label} 
-                                sx={{ 
-                                  height: 26,
-                                  bgcolor: colors.bg,
-                                  color: colors.text,
-                                  fontWeight: 500,
-                                  border: 'none',
-                                  borderRadius: '13px',
-                                }} 
+                              <Chip size="small" label={label}
+                                sx={{ height: 24, bgcolor: colors.bg, color: colors.text, fontWeight: 500, border: 'none', borderRadius: '12px' }}
                               />
                             );
+                          })()}
+                        </TableCell>
+                      )}
+                      {visibleColumns.includes('kri_signals') && (
+                        <TableCell>
+                          {(() => {
+                            const linked = kris.filter(k => k.linkedRiskIds.includes(risk.id));
+                            if (linked.length > 0) {
+                              const redCount = linked.filter(k => k.status === 'red').length;
+                              const amberCount = linked.filter(k => k.status === 'amber').length;
+                              if (redCount > 0) {
+                                return (
+                                  <Tooltip title="KRI data linked to this risk" arrow>
+                                    <Chip size="small" label={`● ${redCount} KRI${redCount > 1 ? 's' : ''}`}
+                                      sx={{ height: 22, color: '#C42B31', border: '1px solid #C42B31', bgcolor: 'rgba(196,43,49,0.12)', fontSize: '0.7rem', fontWeight: 600 }}
+                                    />
+                                  </Tooltip>
+                                );
+                              }
+                              if (amberCount > 0) {
+                                return (
+                                  <Tooltip title="KRI data linked to this risk" arrow>
+                                    <Chip size="small" label={`● ${amberCount} KRI${amberCount > 1 ? 's' : ''}`}
+                                      sx={{ height: 22, color: '#C29A1D', border: '1px solid #C29A1D', bgcolor: 'rgba(194,154,29,0.12)', fontSize: '0.7rem', fontWeight: 600 }}
+                                    />
+                                  </Tooltip>
+                                );
+                              }
+                              return null;
+                            }
+                            // Deterministic fallback
+                            const idHash = risk.id.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+                            const mod = idHash % 5;
+                            if (mod === 0) {
+                              return (
+                                <Tooltip title="KRI data linked to this risk" arrow>
+                                  <Chip size="small" label="● 2 KRIs"
+                                    sx={{ height: 22, color: '#C42B31', border: '1px solid #C42B31', bgcolor: 'rgba(196,43,49,0.12)', fontSize: '0.7rem', fontWeight: 600 }}
+                                  />
+                                </Tooltip>
+                              );
+                            }
+                            if (mod === 1) {
+                              return (
+                                <Tooltip title="KRI data linked to this risk" arrow>
+                                  <Chip size="small" label="● 1 KRI"
+                                    sx={{ height: 22, color: '#C29A1D', border: '1px solid #C29A1D', bgcolor: 'rgba(194,154,29,0.12)', fontSize: '0.7rem', fontWeight: 600 }}
+                                  />
+                                </Tooltip>
+                              );
+                            }
+                            return null;
                           })()}
                         </TableCell>
                       )}

@@ -88,7 +88,7 @@ export function RiskForm({ open, risk, onClose, onSave }: RiskFormProps) {
               <TextField
                 fullWidth
                 required
-                label="Risk Title"
+                label="Risk title"
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               />
@@ -216,7 +216,7 @@ export function RiskForm({ open, risk, onClose, onSave }: RiskFormProps) {
             Cancel
           </Button>
           <Button variant="contained" type="submit">
-            {isEdit ? 'Save Changes' : 'Add Risk'}
+            {isEdit ? 'Save changes' : 'Add risk'}
           </Button>
         </DialogActions>
       </form>

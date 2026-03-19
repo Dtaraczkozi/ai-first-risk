@@ -82,7 +82,7 @@ export function RiskSuggestionCard({ suggestion, onApprove, onReject }: RiskSugg
                   borderColor: 'grey.400',
                   textTransform: 'capitalize',
                   height: 22,
-                  fontSize: 11,
+                  fontSize: 12,
                 }}
               />
               <Chip
@@ -93,7 +93,7 @@ export function RiskSuggestionCard({ suggestion, onApprove, onReject }: RiskSugg
                   color: scoreColor,
                   fontWeight: 600,
                   height: 22,
-                  fontSize: 11,
+                  fontSize: 12,
                 }}
               />
             </Stack>
@@ -122,7 +122,7 @@ export function RiskSuggestionCard({ suggestion, onApprove, onReject }: RiskSugg
             <Box sx={{ flex: 1 }}>
               <Typography variant="caption" color="text.secondary">Suggested Owner</Typography>
               <Stack direction="row" spacing={0.5} alignItems="center">
-                <Avatar sx={{ width: 18, height: 18, fontSize: 10 }}>
+                <Avatar sx={{ width: 18, height: 18, fontSize: 12 }}>
                   {suggestion.suggestedOwner.name.charAt(0)}
                 </Avatar>
                 <Typography variant="body2" fontWeight={500}>
@@ -156,7 +156,7 @@ export function RiskSuggestionCard({ suggestion, onApprove, onReject }: RiskSugg
           size="small"
           startIcon={<ViewIcon />}
         >
-          View Details
+          View details
         </Button>
         <Stack direction="row" spacing={1}>
           <Button

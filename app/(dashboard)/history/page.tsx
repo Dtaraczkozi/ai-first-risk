@@ -49,7 +49,7 @@ export default function HistoryPage() {
           size="small"
           startIcon={<UploadIcon />}
         >
-          New Session
+          New session
         </Button>
       </Stack>
 
@@ -68,7 +68,7 @@ export default function HistoryPage() {
             size="small"
             startIcon={<UploadIcon />}
           >
-            Start First Session
+            Start first session
           </Button>
         </Paper>
       ) : (
@@ -78,7 +78,7 @@ export default function HistoryPage() {
               <TableRow>
                 <TableCell>Date</TableCell>
                 <TableCell>Documents</TableCell>
-                <TableCell>Risks Found</TableCell>
+                <TableCell>Risks found</TableCell>
                 <TableCell>Approved</TableCell>
                 <TableCell>Status</TableCell>
               </TableRow>
@@ -97,7 +97,7 @@ export default function HistoryPage() {
                   <TableCell>
                     <Chip
                       size="small"
-                      label={session.status === 'completed' ? 'Complete' : 'In Progress'}
+                      label={session.status === 'completed' ? 'Complete' : 'In progress'}
                       color={session.status === 'completed' ? 'success' : 'warning'}
                       variant="outlined"
                       sx={{ height: 22 }}

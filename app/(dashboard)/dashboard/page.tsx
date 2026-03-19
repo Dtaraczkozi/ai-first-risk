@@ -8,54 +8,65 @@ import {
   Stack,
   Grid,
   Button,
-  TextField,
-  InputAdornment,
-  IconButton,
   Chip,
-  LinearProgress,
-  Avatar,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import {
   AutoAwesome as AgentIcon,
-  Send as SendIcon,
-  TrendingUp as TrendingUpIcon,
-  Assignment as AssessmentIcon,
-  Security as SecurityIcon,
-  Warning as WarningIcon,
-  CheckCircle as CheckCircleIcon,
-  PlayArrow as PlayArrowIcon,
   ArrowForward as ArrowForwardIcon,
-  Lightbulb as LightbulbIcon,
   Description as ReportIcon,
 } from '@mui/icons-material';
 import Link from 'next/link';
 import { getApprovedRisks, getDraftRisks } from '@/lib/risk-store';
+import { getKRIs } from '@/lib/kri-store';
 import type { RiskSuggestion } from '@/types/document';
+import type { KeyRiskIndicator } from '@/types/kri';
 
-const aiGradient = 'linear-gradient(135deg, #5C6BC0 0%, #9C27B0 50%, #E91E63 100%)';
+const TASK_TYPE_COLORS: Record<string, string> = {
+  ASSESS: '#3b82f6',
+  IDENTIFY: '#9530DC',
+  SUGGEST_CTRL: '#009999',
+  MONITOR: '#C29A1D',
+  REPORT: '#0060C7',
+};
 
-const suggestedPrompts = [
-  'What are my highest priority risks right now?',
-  'Which risks need assessment this week?',
-  'Suggest controls for my cyber risks',
-  'Show me risks without mitigation plans',
-  'What compliance deadlines are coming up?',
+const PENDING_TASKS = [
+  { type: 'ASSESS',       title: 'CR-014 Cloud Infrastructure Exposure',  time: '2h ago',  href: '/assessments' },
+  { type: 'IDENTIFY',     title: 'Batch upload — 14 risks extracted',      time: '1d ago',  href: '/' },
+  { type: 'SUGGEST_CTRL', title: 'FR-003 FX Concentration Risk',           time: '5h ago',  href: '/treatment' },
+  { type: 'ASSESS',       title: 'OP-007 Business Continuity Gaps',        time: '8h ago',  href: '/assessments' },
+  { type: 'REPORT',       title: 'Q1 executive summary draft',             time: '2d ago',  href: '/reporting' },
 ];
+
+const ACTIVITY_LOG = [
+  { type: 'ASSESS',       desc: 'Assessment drafted for CR-011 Ransomware Risk',        outcome: 'Approved', time: '3h ago' },
+  { type: 'MONITOR',      desc: 'KRI-001 threshold breach detected — flagged',           outcome: 'Auto',     time: '6h ago' },
+  { type: 'SUGGEST_CTRL', desc: '3 controls proposed for OP-003 Supply Chain',           outcome: 'Approved', time: '1d ago' },
+  { type: 'IDENTIFY',     desc: 'Risk extraction from Q1 Board Report',                  outcome: 'Approved', time: '1d ago' },
+  { type: 'ASSESS',       desc: 'Assessment drafted for FN-002 Liquidity Risk',          outcome: 'Rejected', time: '2d ago' },
+  { type: 'MONITOR',      desc: 'KRI-007 FX Hedge Ratio breach detected',               outcome: 'Auto',     time: '2d ago' },
+  { type: 'REPORT',       desc: 'Q4 2025 board pack generated',                          outcome: 'Approved', time: '5d ago' },
+  { type: 'SUGGEST_CTRL', desc: 'Controls proposed for CY-005 Phishing',                outcome: 'Approved', time: '6d ago' },
+];
+
+const OUTCOME_COLORS: Record<string, string> = {
+  Approved: '#2EB365',
+  Rejected: '#C42B31',
+  Auto:     '#94a3b8',
+};
 
 function QuickStats({ approvedRisks, draftRisks }: { approvedRisks: RiskSuggestion[]; draftRisks: RiskSuggestion[] }) {
   const totalApproved = approvedRisks.length;
   const totalDrafts = draftRisks.length;
   const highSeverity = approvedRisks.filter(r => Math.round((r.likelihood + r.impact) / 2) >= 4).length;
   const needsAssessment = Math.floor(totalApproved * 0.4);
-  const avgScore = totalApproved > 0 
-    ? (approvedRisks.reduce((sum, r) => sum + Math.round((r.likelihood + r.impact) / 2), 0) / totalApproved).toFixed(1)
-    : '0';
 
   const stats = [
-    { label: 'Total risks', value: totalApproved, subtitle: 'In register', color: '#0060C7' },
-    { label: 'Pending review', value: totalDrafts, subtitle: 'Draft risks', color: '#9530DC' },
-    { label: 'Needs attention', value: needsAssessment, subtitle: 'Awaiting assessment', color: '#E54E54' },
-    { label: 'High severity', value: highSeverity, subtitle: 'Score 4+', color: '#C29A1D' },
+    { label: 'Total risks',     value: totalApproved,   subtitle: 'In register',          color: '#0060C7' },
+    { label: 'Pending review',  value: totalDrafts,     subtitle: 'Draft risks',           color: '#9530DC' },
+    { label: 'Needs attention', value: needsAssessment, subtitle: 'Awaiting assessment',   color: '#E54E54' },
+    { label: 'High severity',   value: highSeverity,    subtitle: 'Score 4+',              color: '#C29A1D' },
   ];
 
   return (
@@ -64,14 +75,7 @@ function QuickStats({ approvedRisks, draftRisks }: { approvedRisks: RiskSuggesti
         <Grid key={stat.label} size={{ xs: 6, md: 3 }}>
           <Paper sx={{ p: 2.5, height: '100%' }} variant="outlined">
             <Stack direction="row" spacing={1.5} alignItems="flex-start">
-              <Box
-                sx={{
-                  width: 4,
-                  height: 40,
-                  borderRadius: 1,
-                  bgcolor: stat.color,
-                }}
-              />
+              <Box sx={{ width: 4, height: 40, borderRadius: 1, bgcolor: stat.color }} />
               <Box>
                 <Typography variant="caption" color="text.secondary">
                   {stat.label}
@@ -91,218 +95,193 @@ function QuickStats({ approvedRisks, draftRisks }: { approvedRisks: RiskSuggesti
   );
 }
 
-function ActionCard({ 
-  title, 
-  description, 
-  count, 
-  icon, 
-  color, 
-  actionLabel,
-  actionHref,
-  items,
-}: {
-  title: string;
-  description: string;
-  count: number;
-  icon: React.ReactNode;
-  color: string;
-  actionLabel: string;
-  actionHref: string;
-  items?: { label: string; value: number; color: string }[];
-}) {
+function KRIStatusStrip({ kris }: { kris: KeyRiskIndicator[] }) {
+  const sorted = [...kris].sort((a, b) => {
+    const order = { red: 0, amber: 1, green: 2 };
+    return order[a.status] - order[b.status];
+  });
+
+  const statusColor: Record<string, string> = {
+    red:   '#C42B31',
+    amber: '#C29A1D',
+    green: '#2EB365',
+  };
+
   return (
-    <Paper sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }} variant="outlined">
-      <Stack direction="row" spacing={2} alignItems="flex-start" sx={{ mb: 2 }}>
-        <Box
-          sx={{
-            color: 'text.secondary',
-          }}
-        >
-          {icon}
-        </Box>
-        <Box sx={{ flex: 1 }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-            {title}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {description}
-          </Typography>
-        </Box>
-        <Typography variant="h4" sx={{ fontWeight: 700, color }}>
-          {count}
+    <Paper variant="outlined" sx={{ px: 2, py: 1.25 }}>
+      <Stack direction="row" alignItems="center" spacing={2}>
+        <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', flexShrink: 0, letterSpacing: '0.05em', textTransform: 'uppercase', fontSize: '0.65rem' }}>
+          KRIs
         </Typography>
-      </Stack>
-
-      {items && items.length > 0 && (
-        <Stack spacing={1.5} sx={{ mb: 2, flex: 1 }}>
-          {items.map((item) => (
-            <Stack key={item.label} direction="row" justifyContent="space-between" alignItems="center">
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: item.color }} />
-                <Typography variant="body2">{item.label}</Typography>
-              </Stack>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>{item.value}</Typography>
-            </Stack>
-          ))}
+        <Stack direction="row" flexWrap="wrap" gap={0.75} sx={{ flex: 1 }}>
+          {sorted.map((kri) => {
+            const color = statusColor[kri.status];
+            const name = kri.name.length > 22 ? kri.name.slice(0, 22) + '…' : kri.name;
+            return (
+              <Chip
+                key={kri.id}
+                size="small"
+                label={
+                  <Stack direction="row" spacing={0.5} alignItems="center" component="span">
+                    <Box component="span" sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: color, display: 'inline-block', flexShrink: 0 }} />
+                    <span>{name} — {kri.currentValue}{kri.threshold.unit}</span>
+                  </Stack>
+                }
+                sx={{
+                  height: 24,
+                  bgcolor: `${color}26`,
+                  border: `1px solid ${color}`,
+                  '& .MuiChip-label': { px: 1, fontSize: '0.7rem' },
+                }}
+              />
+            );
+          })}
         </Stack>
-      )}
-
-      <Button
-        component={Link}
-        href={actionHref}
-        variant="outlined"
-        size="small"
-        endIcon={<ArrowForwardIcon />}
-        sx={{ mt: 'auto', alignSelf: 'flex-start' }}
-      >
-        {actionLabel}
-      </Button>
+        <Button
+          component={Link}
+          href="/treatment"
+          size="small"
+          variant="text"
+          endIcon={<ArrowForwardIcon sx={{ fontSize: 13 }} />}
+          sx={{ flexShrink: 0, whiteSpace: 'nowrap', fontSize: '0.72rem', color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
+        >
+          View all
+        </Button>
+      </Stack>
     </Paper>
   );
 }
 
-function ConversationalInput() {
-  const [inputValue, setInputValue] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-
-  const handleSubmit = () => {
-    if (inputValue.trim()) {
-      setIsTyping(true);
-      setTimeout(() => setIsTyping(false), 2000);
-      setInputValue('');
-    }
-  };
-
-  const handlePromptClick = (prompt: string) => {
-    setInputValue(prompt);
-  };
-
+function AgentQueuePanel({ onApprove }: { onApprove: () => void }) {
   return (
-    <Paper 
-      sx={{ 
-        p: 3, 
-        background: 'linear-gradient(135deg, rgba(92, 107, 192, 0.08) 0%, rgba(99, 102, 241, 0.06) 50%, rgba(167, 139, 250, 0.08) 100%)',
-        border: '1px solid rgba(99, 102, 241, 0.2)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-      }}
-    >
-      <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
-        <Box
-          sx={{
-            width: 36,
-            height: 36,
-            borderRadius: '50%',
-            background: aiGradient,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-          }}
+    <Paper variant="outlined">
+      <Grid container>
+        {/* Left: pending approvals */}
+        <Grid
+          size={{ xs: 12, md: 7 }}
+          sx={{ p: 2.5, borderRight: { md: '1px solid' }, borderColor: { md: 'divider' }, borderBottom: { xs: '1px solid', md: 'none' }, borderBottomColor: { xs: 'divider' } }}
         >
-          <AgentIcon fontSize="small" />
-        </Box>
-        <Box>
-          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-            Ask the Risk Agent
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2 }}>
+            Pending approvals
           </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Get insights, recommendations, or take actions with natural language
-          </Typography>
-        </Box>
-      </Stack>
-
-      <TextField
-        fullWidth
-        placeholder="Ask about your risks, request analysis, or give instructions..."
-        value={inputValue}
-        onChange={(e) => setInputValue(e.target.value)}
-        onKeyPress={(e) => e.key === 'Enter' && handleSubmit()}
-        sx={{
-          mb: 2,
-          '& .MuiOutlinedInput-root': {
-            bgcolor: 'background.paper',
-            borderRadius: 2,
-            '&:hover .MuiOutlinedInput-notchedOutline': {
-              borderColor: 'primary.main',
-            },
-            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-              borderImage: aiGradient,
-              borderImageSlice: 1,
-            },
-          },
-        }}
-        InputProps={{
-          endAdornment: (
-            <InputAdornment position="end">
-              <IconButton 
-                onClick={handleSubmit}
-                disabled={!inputValue.trim()}
-                sx={{
-                  background: inputValue.trim() ? aiGradient : 'grey.200',
-                  color: inputValue.trim() ? 'white' : 'grey.500',
-                  '&:hover': {
-                    background: inputValue.trim() ? aiGradient : 'grey.300',
-                    opacity: 0.9,
-                  },
-                }}
-              >
-                <SendIcon fontSize="small" />
-              </IconButton>
-            </InputAdornment>
-          ),
-        }}
-      />
-
-      {isTyping && (
-        <Box sx={{ mb: 2 }}>
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-            <Box sx={{ width: 24, height: 24, borderRadius: '50%', background: aiGradient, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <AgentIcon sx={{ fontSize: 14, color: 'white' }} />
-            </Box>
-            <Typography variant="body2" color="text.secondary">
-              Analyzing your risk data...
-            </Typography>
+          <Stack spacing={1.25}>
+            {PENDING_TASKS.map((task, idx) => {
+              const color = TASK_TYPE_COLORS[task.type];
+              return (
+                <Stack key={idx} direction="row" spacing={1} alignItems="center">
+                  <Chip
+                    size="small"
+                    label={task.type}
+                    sx={{
+                      height: 20,
+                      bgcolor: `${color}22`,
+                      color,
+                      border: `1px solid ${color}66`,
+                      fontWeight: 700,
+                      fontSize: '0.6rem',
+                      flexShrink: 0,
+                      '& .MuiChip-label': { px: 0.75 },
+                    }}
+                  />
+                  <Typography variant="body2" sx={{ flex: 1, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {task.title}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
+                    {task.time}
+                  </Typography>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={onApprove}
+                    sx={{ flexShrink: 0, fontSize: '0.68rem', py: 0.25, px: 1, minWidth: 'auto' }}
+                  >
+                    Approve
+                  </Button>
+                  <Button
+                    component={Link}
+                    href={task.href}
+                    size="small"
+                    variant="text"
+                    endIcon={<ArrowForwardIcon sx={{ fontSize: 11 }} />}
+                    sx={{ flexShrink: 0, fontSize: '0.68rem', py: 0.25, px: 0.5, whiteSpace: 'nowrap', color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
+                  >
+                    Review
+                  </Button>
+                </Stack>
+              );
+            })}
           </Stack>
-          <LinearProgress 
-            sx={{ 
-              height: 2, 
-              borderRadius: 1,
-              '& .MuiLinearProgress-bar': {
-                background: aiGradient,
-              },
-            }} 
-          />
-        </Box>
-      )}
+          <Button
+            component={Link}
+            href="/assessments"
+            size="small"
+            variant="text"
+            sx={{ mt: 2, fontSize: '0.72rem', color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
+          >
+            View all pending →
+          </Button>
+        </Grid>
 
-      <Box>
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
-          <LightbulbIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-          <Typography variant="caption" color="text.secondary">
-            Try asking
+        {/* Right: recent agent activity */}
+        <Grid size={{ xs: 12, md: 5 }} sx={{ p: 2.5 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2 }}>
+            Recent agent activity
           </Typography>
-        </Stack>
-        <Stack direction="row" flexWrap="wrap" gap={1}>
-          {suggestedPrompts.map((prompt) => (
-            <Chip
-              key={prompt}
-              label={prompt}
-              size="small"
-              onClick={() => handlePromptClick(prompt)}
-              sx={{
-                cursor: 'pointer',
-                bgcolor: 'rgba(22, 27, 39, 0.6)',
-                border: '1px solid rgba(96, 165, 250, 0.15)',
-                '&:hover': {
-                  borderColor: 'primary.main',
-                  bgcolor: 'rgba(96, 165, 250, 0.1)',
-                },
-              }}
-            />
-          ))}
-        </Stack>
-      </Box>
+          <Stack spacing={1.25}>
+            {ACTIVITY_LOG.map((item, idx) => {
+              const color = TASK_TYPE_COLORS[item.type];
+              const outcomeColor = OUTCOME_COLORS[item.outcome];
+              return (
+                <Stack key={idx} direction="row" spacing={1} alignItems="flex-start">
+                  <Chip
+                    size="small"
+                    label={item.type}
+                    sx={{
+                      height: 18,
+                      bgcolor: `${color}1A`,
+                      color,
+                      border: `1px solid ${color}55`,
+                      fontWeight: 700,
+                      fontSize: '0.58rem',
+                      flexShrink: 0,
+                      mt: 0.2,
+                      '& .MuiChip-label': { px: 0.6 },
+                    }}
+                  />
+                  <Typography variant="caption" sx={{ flex: 1, lineHeight: 1.45 }}>
+                    {item.desc}
+                  </Typography>
+                  <Chip
+                    size="small"
+                    label={item.outcome}
+                    variant="outlined"
+                    sx={{
+                      height: 18,
+                      fontSize: '0.58rem',
+                      color: outcomeColor,
+                      borderColor: outcomeColor,
+                      flexShrink: 0,
+                      '& .MuiChip-label': { px: 0.6 },
+                    }}
+                  />
+                  <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0, fontSize: '0.62rem', mt: 0.1 }}>
+                    {item.time}
+                  </Typography>
+                </Stack>
+              );
+            })}
+          </Stack>
+          <Button
+            component={Link}
+            href="/reporting"
+            size="small"
+            variant="text"
+            sx={{ mt: 2, fontSize: '0.72rem', color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
+          >
+            View full history →
+          </Button>
+        </Grid>
+      </Grid>
     </Paper>
   );
 }
@@ -310,34 +289,21 @@ function ConversationalInput() {
 export default function DashboardPage() {
   const [approvedRisks, setApprovedRisks] = useState<RiskSuggestion[]>([]);
   const [draftRisks, setDraftRisks] = useState<RiskSuggestion[]>([]);
+  const [kris, setKRIs] = useState<KeyRiskIndicator[]>([]);
+  const [approveSnackbar, setApproveSnackbar] = useState(false);
 
   useEffect(() => {
     setApprovedRisks(getApprovedRisks());
     setDraftRisks(getDraftRisks());
+    setKRIs(getKRIs());
   }, []);
 
   const totalRisks = approvedRisks.length;
-  const needsAssessment = Math.floor(totalRisks * 0.4);
-  const inProgress = Math.floor(totalRisks * 0.25);
-  const mitigated = Math.floor(totalRisks * 0.25);
-  const monitoring = totalRisks - needsAssessment - inProgress - mitigated;
-
-  const treatmentAccept = Math.floor(totalRisks * 0.2);
-  const treatmentMitigate = Math.floor(totalRisks * 0.5);
-  const treatmentTransfer = Math.floor(totalRisks * 0.2);
-  const treatmentAvoid = totalRisks - treatmentAccept - treatmentMitigate - treatmentTransfer;
-
-  const controlsImplemented = Math.floor(totalRisks * 2.3);
-  const controlsPending = Math.floor(totalRisks * 0.8);
 
   const getSummaryMessage = () => {
-    if (totalRisks === 0 && draftRisks.length === 0) {
-      return "Your risk register is ready to be populated";
-    }
-    if (totalRisks === 0 && draftRisks.length > 0) {
-      return "Your risk register has drafts awaiting approval";
-    }
-    return "Your risk register is healthy and well mitigated";
+    if (totalRisks === 0 && draftRisks.length === 0) return 'Your risk register is ready to be populated';
+    if (totalRisks === 0 && draftRisks.length > 0) return 'Your risk register has drafts awaiting approval';
+    return 'Your risk register is healthy and well mitigated';
   };
 
   return (
@@ -349,10 +315,7 @@ export default function DashboardPage() {
           </Typography>
         </Box>
         <Stack direction="row" spacing={1}>
-          <Button
-            variant="contained"
-            startIcon={<ReportIcon />}
-          >
+          <Button variant="contained" startIcon={<ReportIcon />}>
             New report
           </Button>
         </Stack>
@@ -365,123 +328,33 @@ export default function DashboardPage() {
       </Box>
 
       <Box sx={{ mb: 3 }}>
-        <ConversationalInput />
-      </Box>
-
-      <Box sx={{ mb: 3 }}>
         <QuickStats approvedRisks={approvedRisks} draftRisks={draftRisks} />
       </Box>
 
+      {kris.length > 0 && (
+        <Box sx={{ mb: 3 }}>
+          <KRIStatusStrip kris={kris} />
+        </Box>
+      )}
+
       <Box sx={{ mb: 3 }}>
-        <Paper sx={{ p: 3 }} variant="outlined">
-          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-              Quick actions
-            </Typography>
-          </Stack>
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 6, md: 3 }}>
-              <Button
-                component={Link}
-                href="/?new=true"
-                variant="outlined"
-                fullWidth
-                startIcon={<AgentIcon />}
-                sx={{ py: 1.5, justifyContent: 'flex-start' }}
-              >
-                Run AI analysis
-              </Button>
-            </Grid>
-            <Grid size={{ xs: 6, md: 3 }}>
-              <Button
-                component={Link}
-                href="/risks"
-                variant="outlined"
-                fullWidth
-                startIcon={<WarningIcon />}
-                sx={{ py: 1.5, justifyContent: 'flex-start' }}
-              >
-                Review high risks
-              </Button>
-            </Grid>
-            <Grid size={{ xs: 6, md: 3 }}>
-              <Button
-                component={Link}
-                href="/risks"
-                variant="outlined"
-                fullWidth
-                startIcon={<AssessmentIcon />}
-                sx={{ py: 1.5, justifyContent: 'flex-start' }}
-              >
-                Pending assessments
-              </Button>
-            </Grid>
-            <Grid size={{ xs: 6, md: 3 }}>
-              <Button
-                component={Link}
-                href="/history"
-                variant="outlined"
-                fullWidth
-                startIcon={<TrendingUpIcon />}
-                sx={{ py: 1.5, justifyContent: 'flex-start' }}
-              >
-                View history
-              </Button>
-            </Grid>
-          </Grid>
-        </Paper>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
+          <AgentIcon sx={{ fontSize: 18, background: 'linear-gradient(135deg,#5C6BC0,#9C27B0,#E91E63)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }} />
+          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Agent queue</Typography>
+        </Stack>
+        <AgentQueuePanel onApprove={() => setApproveSnackbar(true)} />
       </Box>
 
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12, md: 4 }}>
-          <ActionCard
-            title="Assessments"
-            description="Risk assessments requiring attention"
-            count={needsAssessment}
-            icon={<AssessmentIcon />}
-            color="#E54E54"
-            actionLabel="View assessments"
-            actionHref="/risks"
-            items={[
-              { label: 'Needs Assessment', value: needsAssessment, color: '#E54E54' },
-              { label: 'In Progress', value: inProgress, color: '#C29A1D' },
-              { label: 'Completed', value: mitigated + monitoring, color: '#2EB365' },
-            ]}
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 4 }}>
-          <ActionCard
-            title="Treatment Plans"
-            description="Active treatment strategies"
-            count={treatmentMitigate + treatmentAccept}
-            icon={<SecurityIcon />}
-            color="#0060C7"
-            actionLabel="Manage treatments"
-            actionHref="/risks"
-            items={[
-              { label: 'Mitigate', value: treatmentMitigate, color: '#0060C7' },
-              { label: 'Accept', value: treatmentAccept, color: '#2EB365' },
-              { label: 'Transfer', value: treatmentTransfer, color: '#9530DC' },
-              { label: 'Avoid', value: treatmentAvoid, color: '#C29A1D' },
-            ]}
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 4 }}>
-          <ActionCard
-            title="Controls"
-            description="Control implementation status"
-            count={controlsImplemented + controlsPending}
-            icon={<CheckCircleIcon />}
-            color="#2EB365"
-            actionLabel="View controls"
-            actionHref="/risks"
-            items={[
-              { label: 'Implemented', value: controlsImplemented, color: '#2EB365' },
-              { label: 'Pending', value: controlsPending, color: '#C29A1D' },
-            ]}
-          />
-        </Grid>
-      </Grid>
+      <Snackbar
+        open={approveSnackbar}
+        autoHideDuration={3000}
+        onClose={() => setApproveSnackbar(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setApproveSnackbar(false)} severity="success" variant="filled" sx={{ width: '100%' }}>
+          Approved
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

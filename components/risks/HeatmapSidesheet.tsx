@@ -222,7 +222,7 @@ export function HeatmapSidesheet({ cell, onClose }: HeatmapSidesheetProps) {
             {/* Risk list */}
             <Typography
               variant="caption"
-              sx={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, color: 'text.secondary', display: 'block', mb: 1.5 }}
+              sx={{ letterSpacing: '0.04em', fontWeight: 700, color: 'text.secondary', display: 'block', mb: 1.5 }}
             >
               Risks in zone
             </Typography>
@@ -257,12 +257,10 @@ export function HeatmapSidesheet({ cell, onClose }: HeatmapSidesheetProps) {
                       label={risk.category}
                       sx={{
                         height: 18,
-                        fontSize: '0.65rem',
+                        fontSize: '0.75rem',
                         textTransform: 'capitalize',
                         borderRadius: 0.75,
-                        bgcolor: `${categoryColors[risk.category] || '#6B7280'}22`,
-                        color: categoryColors[risk.category] || '#94a3b8',
-                        border: 'none',
+                        color: 'text.secondary',
                       }}
                     />
                     {risk.suggestedOwner && (
@@ -280,7 +278,7 @@ export function HeatmapSidesheet({ cell, onClose }: HeatmapSidesheetProps) {
             {/* Suggested actions */}
             <Typography
               variant="caption"
-              sx={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, color: 'text.secondary', display: 'block', mb: 1.5 }}
+              sx={{ letterSpacing: '0.04em', fontWeight: 700, color: 'text.secondary', display: 'block', mb: 1.5 }}
             >
               Suggested actions
             </Typography>
@@ -326,7 +324,7 @@ export function HeatmapSidesheet({ cell, onClose }: HeatmapSidesheetProps) {
                           }),
                         }}
                       >
-                        Start with Agent
+                        Start with agent
                       </Button>
                     </Box>
                   </Stack>

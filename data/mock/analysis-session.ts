@@ -294,11 +294,11 @@ export const mockRiskSuggestions: RiskSuggestion[] = [
 
 export const analysisSteps = [
   { status: 'uploading', label: 'Processing uploaded documents', duration: 2000 },
-  { status: 'analyzing_documents', label: 'Extracting organization structure and existing risks', duration: 3000 },
-  { status: 'researching_external', label: 'Gathering external intelligence sources', duration: 4000 },
-  { status: 'generating_risks', label: 'Identifying and assessing risks', duration: 3000 },
-  { status: 'deduplicating', label: 'Deduplicating with existing risks', duration: 2000 },
-  { status: 'ready_for_review', label: 'Ready for review', duration: 0 },
+  { status: 'analyzing_documents', label: 'Source ingestion', duration: 3000 },
+  { status: 'researching_external', label: 'External horizon scan', duration: 4000 },
+  { status: 'generating_risks', label: 'Risk extraction', duration: 3000 },
+  { status: 'deduplicating', label: 'Register deduplication', duration: 2000 },
+  { status: 'ready_for_review', label: 'Ready for practitioner review', duration: 0 },
 ];
 
 export const additionalMockRisks: RiskSuggestion[] = [

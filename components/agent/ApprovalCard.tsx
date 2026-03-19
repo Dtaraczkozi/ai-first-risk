@@ -31,11 +31,11 @@ interface ApprovalCardProps {
 }
 
 const taskTypeConfig: Record<AgentTaskType, { label: string; icon: React.ReactElement; color: string }> = {
-  identify: { label: 'Risk Identified', icon: <AddIcon fontSize="small" />, color: '#1976d2' },
+  identify: { label: 'Risk identified', icon: <AddIcon fontSize="small" />, color: '#1976d2' },
   assess: { label: 'Assessment', icon: <AssessmentIcon fontSize="small" />, color: '#ed6c02' },
-  suggest_controls: { label: 'Control Suggestion', icon: <SecurityIcon fontSize="small" />, color: '#2e7d32' },
-  monitor: { label: 'Monitoring Alert', icon: <WarningIcon fontSize="small" />, color: '#d32f2f' },
-  report: { label: 'Report Ready', icon: <AssessmentIcon fontSize="small" />, color: '#9c27b0' },
+  suggest_controls: { label: 'Control suggestion', icon: <SecurityIcon fontSize="small" />, color: '#2e7d32' },
+  monitor: { label: 'Monitoring alert', icon: <WarningIcon fontSize="small" />, color: '#d32f2f' },
+  report: { label: 'Report ready', icon: <AssessmentIcon fontSize="small" />, color: '#9c27b0' },
 };
 
 export function ApprovalCard({ request, onApprove, onReject, onViewDetails }: ApprovalCardProps) {
@@ -115,7 +115,7 @@ export function ApprovalCard({ request, onApprove, onReject, onViewDetails }: Ap
         
         <Box sx={{ backgroundColor: 'rgba(13, 17, 23, 0.5)', borderRadius: 1, p: 2, mb: 2, border: '1px solid rgba(96, 165, 250, 0.08)' }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-            AI Reasoning
+            AI reasoning
           </Typography>
           <Typography variant="body2" color="text.secondary">
             {request.reasoning}
@@ -150,7 +150,7 @@ export function ApprovalCard({ request, onApprove, onReject, onViewDetails }: Ap
           size="small"
           onClick={() => onViewDetails(request.id)}
         >
-          View Details
+          View details
         </Button>
         <Stack direction="row" spacing={1}>
           <Button

@@ -57,6 +57,7 @@ export function getRiskScoreColor(score: number): string {
   return '#9c27b0';
 }
 
+/** Colour for a 1–5 integer severity value (likelihood, impact, or rounded score). */
 export function getSeverityColor(severity: number): string {
   const colors: Record<number, string> = {
     1: '#7ECDA0',
@@ -68,6 +69,11 @@ export function getSeverityColor(severity: number): string {
   return colors[severity] || '#9e9e9e';
 }
 
+/** Colour for a continuous score value (rounds to nearest integer band). */
+export function getScoreColor(score: number): string {
+  return getSeverityColor(Math.min(5, Math.max(1, Math.round(score))));
+}
+
 export function getSeverityLabel(severity: number): string {
   const labels: Record<number, string> = {
     1: 'Very Low',
@@ -77,4 +83,40 @@ export function getSeverityLabel(severity: number): string {
     5: 'Critical',
   };
   return labels[severity] || 'Unknown';
+}
+
+/** Human-readable label for a continuous 1–5 risk score (uses midpoint thresholds). */
+export function getScoreLabel(score: number): string {
+  if (score >= 4.5) return 'Very high';
+  if (score >= 3.5) return 'High';
+  if (score >= 2.5) return 'Medium';
+  if (score >= 1.5) return 'Low';
+  return 'Very low';
+}
+
+/** Canonical category → accent colour used across all pages. */
+export const RISK_CATEGORY_COLORS: Record<string, string> = {
+  operational: '#0060C7',
+  compliance:  '#9530DC',
+  financial:   '#009999',
+  cyber:       '#C42B31',
+  strategic:   '#C29A1D',
+};
+
+/** Canonical category → display label used across all pages. */
+export const RISK_CATEGORY_LABELS: Record<string, string> = {
+  operational: 'Operational',
+  compliance:  'Compliance',
+  financial:   'Financial',
+  cyber:       'Cyber',
+  strategic:   'Strategic',
+};
+
+/**
+ * Returns a stable human-readable display ID (e.g. "RSK-1") for a risk
+ * based on its position in the master risk list.
+ */
+export function getRiskDisplayId(riskId: string, allRisks: { id: string }[]): string {
+  const idx = allRisks.findIndex(r => r.id === riskId);
+  return idx >= 0 ? `RSK-${idx + 1}` : 'RSK-?';
 }

@@ -33,18 +33,12 @@ import {
   Check as ApproveIcon,
 } from '@mui/icons-material';
 import { mockRiskSuggestions, additionalMockRisks } from '@/data/mock/analysis-session';
-import { getSeverityColor } from '@/lib/utils';
+import { getSeverityColor, RISK_CATEGORY_COLORS } from '@/lib/utils';
 import { getApprovedRisks, addApprovedRisk, getRiskById, updateDraftRisk, updateApprovedRisk } from '@/lib/risk-store';
 
 const AI_GRADIENT = 'linear-gradient(135deg, #5C6BC0 0%, #9C27B0 50%, #E91E63 100%)';
 
-const categoryColors: Record<string, string> = {
-  operational: '#0060C7',
-  compliance: '#9530DC',
-  financial: '#009999',
-  cyber: '#C42B31',
-  strategic: '#C29A1D',
-};
+const categoryColors = RISK_CATEGORY_COLORS;
 
 const ownerColors: Record<string, string> = {
   'Sarah Chen': '#0060C7',
@@ -242,6 +236,10 @@ export default function RiskDetailPage({ params }: { params: Promise<{ id: strin
 
   const [acceptedFields, setAcceptedFields] = useState<Record<string, boolean>>({});
   const [updatingFields, setUpdatingFields] = useState<Record<string, boolean>>({});
+
+  // When the risk is already approved every field is considered accepted —
+  // there are no pending AI suggestions to act on.
+  const fieldAccepted = (field: string) => isApproved || (acceptedFields[field] ?? false);
   const [toast, setToast] = useState<{ open: boolean; message: string }>({ open: false, message: '' });
   
   const lastProcessedDescription = useRef(description);
@@ -408,7 +406,7 @@ export default function RiskDetailPage({ params }: { params: Promise<{ id: strin
       <Box>
         <Typography>Risk not found</Typography>
         <Button startIcon={<BackIcon />} onClick={() => router.back()}>
-          Go Back
+          Go back
         </Button>
       </Box>
     );
@@ -531,7 +529,7 @@ export default function RiskDetailPage({ params }: { params: Promise<{ id: strin
             <AiField 
               label="Name" 
               required 
-              accepted={acceptedFields.name || false} 
+              accepted={fieldAccepted('name')} 
               onAccept={() => acceptField('name')}
             >
               <TextField
@@ -559,7 +557,7 @@ export default function RiskDetailPage({ params }: { params: Promise<{ id: strin
           <Grid size={{ xs: 12, md: 6 }}>
             <AiField 
               label="Owners" 
-              accepted={acceptedFields.owner || false} 
+              accepted={fieldAccepted('owner')} 
               onAccept={() => acceptField('owner')}
             >
               <Select
@@ -586,7 +584,7 @@ export default function RiskDetailPage({ params }: { params: Promise<{ id: strin
           <Grid size={{ xs: 12, md: 6 }}>
             <AiField 
               label="Risk category" 
-              accepted={acceptedFields.category || false} 
+              accepted={fieldAccepted('category')} 
               onAccept={() => acceptField('category')}
             >
               <Select 
@@ -608,7 +606,7 @@ export default function RiskDetailPage({ params }: { params: Promise<{ id: strin
         <Box sx={{ mt: 3 }}>
           <AiField 
             label="Org unit" 
-            accepted={acceptedFields.orgUnit || false} 
+            accepted={fieldAccepted('orgUnit')} 
             onAccept={() => acceptField('orgUnit')}
           >
             <Select 
@@ -628,7 +626,7 @@ export default function RiskDetailPage({ params }: { params: Promise<{ id: strin
         <Box sx={{ mt: 3 }}>
           <AiField 
             label="Description" 
-            accepted={acceptedFields.description || false} 
+            accepted={fieldAccepted('description')} 
             onAccept={() => acceptField('description')}
           >
             <TextField
@@ -670,7 +668,7 @@ export default function RiskDetailPage({ params }: { params: Promise<{ id: strin
           <Grid size={{ xs: 12, md: 4 }}>
             <AiField 
               label="Likelihood"
-              accepted={acceptedFields.likelihood || false} 
+              accepted={fieldAccepted('likelihood')} 
               onAccept={() => acceptField('likelihood')}
               updating={updatingFields.likelihood}
             >
@@ -695,7 +693,7 @@ export default function RiskDetailPage({ params }: { params: Promise<{ id: strin
           <Grid size={{ xs: 12, md: 4 }}>
             <AiField 
               label="Impact"
-              accepted={acceptedFields.impact || false} 
+              accepted={fieldAccepted('impact')} 
               onAccept={() => acceptField('impact')}
               updating={updatingFields.impact}
             >
@@ -720,7 +718,7 @@ export default function RiskDetailPage({ params }: { params: Promise<{ id: strin
           <Grid size={{ xs: 12, md: 4 }}>
             <AiField 
               label="Score"
-              accepted={acceptedFields.score || false} 
+              accepted={fieldAccepted('score')} 
               onAccept={() => acceptField('score')}
               updating={updatingFields.score}
             >
@@ -751,7 +749,7 @@ export default function RiskDetailPage({ params }: { params: Promise<{ id: strin
             <Typography variant="body2" component="label">
               Treatment type
             </Typography>
-            {(!acceptedFields.treatmentType && !updatingFields.treatmentType) && (
+            {(!fieldAccepted('treatmentType') && !updatingFields.treatmentType) && (
               <Tooltip title="AI suggestion" arrow placement="top">
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <SparkleIcon 
@@ -791,7 +789,7 @@ export default function RiskDetailPage({ params }: { params: Promise<{ id: strin
         <Box sx={{ mt: 3, mb: 3 }}>
           <AiField 
             label="Treatment plan"
-            accepted={acceptedFields.treatment || false} 
+            accepted={fieldAccepted('treatment')} 
             onAccept={() => acceptField('treatment')}
             updating={updatingFields.treatment}
           >

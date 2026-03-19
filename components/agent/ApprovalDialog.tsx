@@ -60,7 +60,7 @@ export function ApprovalDialog({ open, request, action, onClose, onConfirm }: Ap
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <Box>
             <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
-              {isApprove ? 'Approve Action' : 'Reject Action'}
+              {isApprove ? 'Approve action' : 'Reject action'}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               {isApprove 
@@ -115,7 +115,7 @@ export function ApprovalDialog({ open, request, action, onClose, onConfirm }: Ap
           <Divider sx={{ my: 2 }} />
 
           <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-            Proposed Changes
+            Proposed changes
           </Typography>
           <Box
             sx={{
@@ -159,7 +159,7 @@ export function ApprovalDialog({ open, request, action, onClose, onConfirm }: Ap
           onClick={handleConfirm}
           autoFocus
         >
-          {isApprove ? 'Confirm Approval' : 'Confirm Rejection'}
+          {isApprove ? 'Confirm approval' : 'Confirm rejection'}
         </Button>
       </DialogActions>
     </Dialog>

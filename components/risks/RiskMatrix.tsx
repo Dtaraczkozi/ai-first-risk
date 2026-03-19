@@ -42,7 +42,7 @@ export function RiskMatrix({ risks, onRiskClick }: RiskMatrixProps) {
               fontWeight: 600,
             }}
           >
-            LIKELIHOOD →
+            Likelihood →
           </Typography>
         </Box>
 
@@ -51,7 +51,7 @@ export function RiskMatrix({ risks, onRiskClick }: RiskMatrixProps) {
             <Box />
             {IMPACT_LABELS.map((label, i) => (
               <Box key={i} sx={{ textAlign: 'center', pb: 0.5 }}>
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
                   {label}
                 </Typography>
               </Box>
@@ -68,7 +68,7 @@ export function RiskMatrix({ risks, onRiskClick }: RiskMatrixProps) {
                     pr: 1,
                   }}
                 >
-                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
                     {LIKELIHOOD_LABELS[likelihood - 1]}
                   </Typography>
                 </Box>
@@ -145,7 +145,7 @@ export function RiskMatrix({ risks, onRiskClick }: RiskMatrixProps) {
             <Box />
             <Box sx={{ gridColumn: 'span 5', textAlign: 'center', pt: 0.5 }}>
               <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                IMPACT →
+                Impact →
               </Typography>
             </Box>
           </Box>
