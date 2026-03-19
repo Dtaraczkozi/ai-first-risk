@@ -74,7 +74,7 @@ export function DocumentUpload({ documents, isUploading, uploadProgress, onStart
           transition: 'all 0.2s',
           '&:hover': {
             borderColor: 'primary.main',
-            backgroundColor: 'primary.50',
+            backgroundColor: 'rgba(96, 165, 250, 0.08)',
           },
         }}
       >
@@ -118,7 +118,7 @@ export function DocumentUpload({ documents, isUploading, uploadProgress, onStart
           
           return (
             <Paper key={category} variant="outlined" sx={{ overflow: 'hidden' }}>
-              <Box sx={{ px: 1.5, py: 0.75, backgroundColor: 'grey.50', borderBottom: '1px solid', borderColor: 'divider' }}>
+              <Box sx={{ px: 1.5, py: 0.75, backgroundColor: 'rgba(13, 17, 23, 0.6)', borderBottom: '1px solid rgba(96, 165, 250, 0.1)' }}>
                 <Typography variant="caption" sx={{ fontWeight: 600 }}>
                   {categoryLabels[category]} ({loadedCount > 0 ? `${loadedCount} files` : 'loading...'})
                 </Typography>

@@ -27,6 +27,7 @@ import Link from 'next/link';
 import { getSeverityColor } from '@/lib/utils';
 import { getApprovedRisks, seedMockRisks } from '@/lib/risk-store';
 import { TableToolbar } from '@/components/TableToolbar';
+import { HeatmapSidesheet, type SelectedCell } from '@/components/risks/HeatmapSidesheet';
 import type { RiskSuggestion } from '@/types/document';
 
 const categoryColors: Record<string, string> = {
@@ -55,7 +56,7 @@ const getOwnerColor = (name: string): string => {
   return ownerColors[name] || '#6B7280';
 };
 
-function RiskVisualizations({ risks }: { risks: RiskSuggestion[] }) {
+function RiskVisualizations({ risks, onCellClick }: { risks: RiskSuggestion[]; onCellClick: (cell: SelectedCell) => void }) {
   if (risks.length === 0) return null;
 
   const categoryCount = risks.reduce((acc, r) => {
@@ -64,7 +65,7 @@ function RiskVisualizations({ risks }: { risks: RiskSuggestion[] }) {
   }, {} as Record<string, number>);
 
   const statusCount = risks.reduce((acc, r) => {
-    const status = getRandomStatus(r.id);
+    const status = getAssessmentStatus(r);
     acc[status] = (acc[status] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
@@ -78,7 +79,7 @@ function RiskVisualizations({ risks }: { risks: RiskSuggestion[] }) {
 
   const getHeatmapColor = (likelihood: number, impact: number) => {
     const cellRisks = heatmapData[`${likelihood}-${impact}`] || [];
-    if (cellRisks.length === 0) return '#F5F5F5';
+    if (cellRisks.length === 0) return 'rgba(255, 255, 255, 0.04)';
     const score = Math.round((likelihood + impact) / 2);
     if (score <= 1) return ragColors.positive[4];
     if (score <= 2) return ragColors.positive[3];
@@ -116,9 +117,17 @@ function RiskVisualizations({ risks }: { risks: RiskSuggestion[] }) {
                         <Cell key={`cell-${index}`} fill={categoryColors[name] || '#6B7280'} />
                       ))}
                     </Pie>
-                    <RechartsTooltip 
+                    <RechartsTooltip
                       formatter={(value: number | undefined) => [`${value ?? 0} risks`, '']}
-                      contentStyle={{ borderRadius: 8, border: '1px solid #e0e0e0' }}
+                      contentStyle={{
+                        borderRadius: 8,
+                        border: '1px solid rgba(96, 165, 250, 0.2)',
+                        background: 'rgba(10, 14, 26, 0.95)',
+                        backdropFilter: 'blur(12px)',
+                        color: '#e2e8f0',
+                        boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+                      }}
+                      itemStyle={{ color: '#94a3b8' }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
@@ -235,6 +244,11 @@ function RiskVisualizations({ risks }: { risks: RiskSuggestion[] }) {
                             }}
                           >
                             <Box
+                              onClick={() => {
+                                if (count > 0) {
+                                  onCellClick({ likelihood, impact, risks: cellRisks });
+                                }
+                              }}
                               sx={{
                                 bgcolor: getHeatmapColor(likelihood, impact),
                                 borderRadius: 0.5,
@@ -242,11 +256,17 @@ function RiskVisualizations({ risks }: { risks: RiskSuggestion[] }) {
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 cursor: count > 0 ? 'pointer' : 'default',
-                                border: count > 0 ? '1px solid rgba(0,0,0,0.1)' : 'none',
+                                border: count > 0 ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(255,255,255,0.04)',
+                                transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                                '&:hover': count > 0 ? {
+                                  transform: 'scale(1.08)',
+                                  boxShadow: '0 0 12px rgba(96, 165, 250, 0.3)',
+                                  zIndex: 1,
+                                } : {},
                               }}
                             >
                               {count > 0 && (
-                                <Typography variant="caption" sx={{ fontSize: 10, fontWeight: 600, color: 'white', textShadow: '0 0 2px rgba(0,0,0,0.5)' }}>
+                                <Typography variant="caption" sx={{ fontSize: 10, fontWeight: 700, color: 'white', textShadow: '0 1px 3px rgba(0,0,0,0.6)' }}>
                                   {count}
                                 </Typography>
                               )}
@@ -298,9 +318,17 @@ function RiskVisualizations({ risks }: { risks: RiskSuggestion[] }) {
                         <Cell key={`status-${index}`} fill={statusColors[status]?.bg || '#6B7280'} />
                       ))}
                     </Pie>
-                    <RechartsTooltip 
+                    <RechartsTooltip
                       formatter={(value: number | undefined) => [`${value ?? 0} risks`, '']}
-                      contentStyle={{ borderRadius: 8, border: '1px solid #e0e0e0' }}
+                      contentStyle={{
+                        borderRadius: 8,
+                        border: '1px solid rgba(96, 165, 250, 0.2)',
+                        background: 'rgba(10, 14, 26, 0.95)',
+                        backdropFilter: 'blur(12px)',
+                        color: '#e2e8f0',
+                        boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+                      }}
+                      itemStyle={{ color: '#94a3b8' }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
@@ -353,10 +381,11 @@ const statusColors: Record<string, { bg: string; text: string }> = {
   assessed: { bg: '#9FE870', text: '#1a1a1a' },
 };
 
-const getRandomStatus = (riskId: string): string => {
-  const hash = riskId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const statuses = ['unassessed', 'in_progress', 'assessed'];
-  return statuses[hash % statuses.length];
+const getAssessmentStatus = (risk: RiskSuggestion): string => {
+  if (risk.assessmentStatus) return risk.assessmentStatus;
+  // Fallback for legacy data without assessmentStatus stored
+  const hash = risk.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return ['unassessed', 'in_progress', 'assessed'][hash % 3];
 };
 
 export default function RiskRegisterPage() {
@@ -364,6 +393,7 @@ export default function RiskRegisterPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilters, setActiveFilters] = useState<Record<string, string | string[]>>({});
   const [visibleColumns, setVisibleColumns] = useState<string[]>(['risk', 'category', 'score', 'owner', 'status']);
+  const [selectedCell, setSelectedCell] = useState<SelectedCell | null>(null);
 
   useEffect(() => {
     seedMockRisks(50);
@@ -483,7 +513,7 @@ export default function RiskRegisterPage() {
         </Paper>
       ) : (
         <>
-          <RiskVisualizations risks={approvedRisks} />
+          <RiskVisualizations risks={approvedRisks} onCellClick={setSelectedCell} />
 
           <TableToolbar
             searchTerm={searchTerm}
@@ -497,6 +527,8 @@ export default function RiskRegisterPage() {
             visibleColumns={visibleColumns}
             onColumnToggle={handleColumnToggle}
           />
+
+          <HeatmapSidesheet cell={selectedCell} onClose={() => setSelectedCell(null)} />
 
           <TableContainer component={Paper} variant="outlined">
             <Table size="small">
@@ -585,7 +617,7 @@ export default function RiskRegisterPage() {
                       {visibleColumns.includes('status') && (
                         <TableCell>
                           {(() => {
-                            const status = getRandomStatus(risk.id);
+                            const status = getAssessmentStatus(risk);
                             const colors = statusColors[status];
                             const label = statusOptions.find(s => s.value === status)?.label || status;
                             return (

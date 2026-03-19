@@ -141,6 +141,9 @@ export function seedMockRisks(count: number = 50): void {
       sources.push(generateMockSource(template.category));
     }
 
+    const assessmentStatuses: RiskSuggestion['assessmentStatus'][] = ['unassessed', 'in_progress', 'assessed'];
+    const assessmentStatus = assessmentStatuses[Math.floor(Math.random() * assessmentStatuses.length)];
+
     risks.push({
       id: `risk-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`,
       title: template.title,
@@ -152,6 +155,7 @@ export function seedMockRisks(count: number = 50): void {
       reasoning: `This risk was identified through analysis of ${sources.length} source${sources.length > 1 ? 's' : ''} and represents a ${severity >= 4 ? 'high' : severity >= 3 ? 'medium' : 'low'} priority concern for the organization.`,
       sources,
       status: 'approved',
+      assessmentStatus,
       suggestedOwner: owner,
       createdAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000),
     });
@@ -176,7 +180,7 @@ export function addApprovedRisk(risk: RiskSuggestion): void {
   const risks = getApprovedRisks();
   const exists = risks.some(r => r.id === risk.id);
   if (!exists) {
-    risks.push({ ...risk, status: 'approved' });
+    risks.push({ ...risk, status: 'approved', assessmentStatus: 'unassessed' });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(risks));
   }
 }

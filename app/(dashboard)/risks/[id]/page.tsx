@@ -458,14 +458,25 @@ export default function RiskDetailPage({ params }: { params: Promise<{ id: strin
               <Typography variant="h4" component="h1" sx={{ fontWeight: 600 }}>
                 {title || risk.title}
               </Typography>
-              <Chip
-                size="small"
-                label={isDraft ? 'Draft' : 'Approved'}
-                sx={isDraft 
-                  ? { bgcolor: 'grey.300', color: 'grey.700' }
-                  : { bgcolor: 'success.main', color: 'white' }
-                }
-              />
+              {(() => {
+                const assessmentStatusConfig = {
+                  unassessed: { label: 'Unassessed', bg: '#FADF6B', text: '#1a1a1a' },
+                  in_progress: { label: 'In progress', bg: '#5DD3F3', text: '#1a1a1a' },
+                  assessed:    { label: 'Assessed',    bg: '#9FE870', text: '#1a1a1a' },
+                };
+                const aStatus = risk?.assessmentStatus ?? 'unassessed';
+                const aConfig = assessmentStatusConfig[aStatus];
+                return (
+                  <Chip
+                    size="small"
+                    label={isDraft ? 'Draft' : aConfig.label}
+                    sx={isDraft
+                      ? { bgcolor: 'rgba(100,116,139,0.2)', color: '#94a3b8' }
+                      : { bgcolor: aConfig.bg, color: aConfig.text, fontWeight: 500 }
+                    }
+                  />
+                );
+              })()}
             </Stack>
             <Stack direction="row" spacing={2} sx={{ mt: 0.5, ml: 5 }}>
               <Typography variant="caption" color="text.secondary">
@@ -830,7 +841,7 @@ export default function RiskDetailPage({ params }: { params: Promise<{ id: strin
                       direction="row"
                       justifyContent="space-between"
                       alignItems="center"
-                      sx={{ p: 1.5, bgcolor: 'grey.50', borderRadius: 1 }}
+                      sx={{ p: 1.5, bgcolor: 'rgba(13, 17, 23, 0.5)', borderRadius: 1, border: '1px solid rgba(96, 165, 250, 0.08)' }}
                     >
                       <Box>
                         <Typography variant="body2" fontWeight={600}>

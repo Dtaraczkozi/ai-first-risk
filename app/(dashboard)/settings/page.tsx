@@ -94,11 +94,11 @@ export default function SettingsPage() {
   };
 
   const typeIcons: Record<string, React.ReactNode> = {
-    competitor: <CompetitorIcon sx={{ fontSize: 20, color: '#282E37' }} />,
-    news: <NewsIcon sx={{ fontSize: 20, color: '#282E37' }} />,
-    '10k_filing': <RegulatoryIcon sx={{ fontSize: 20, color: '#282E37' }} />,
-    trend: <TrendIcon sx={{ fontSize: 20, color: '#282E37' }} />,
-    document: <FileIcon sx={{ fontSize: 20, color: '#282E37' }} />,
+    competitor: <CompetitorIcon sx={{ fontSize: 20, color: 'text.secondary' }} />,
+    news: <NewsIcon sx={{ fontSize: 20, color: 'text.secondary' }} />,
+    '10k_filing': <RegulatoryIcon sx={{ fontSize: 20, color: 'text.secondary' }} />,
+    trend: <TrendIcon sx={{ fontSize: 20, color: 'text.secondary' }} />,
+    document: <FileIcon sx={{ fontSize: 20, color: 'text.secondary' }} />,
   };
 
   const typeLabels: Record<string, string> = {
@@ -125,7 +125,7 @@ export default function SettingsPage() {
       <Box sx={{ mb: 4 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
           <Stack direction="row" spacing={1.5} alignItems="center">
-            <FolderIcon sx={{ fontSize: 24, color: '#282E37' }} />
+            <FolderIcon sx={{ fontSize: 24, color: 'text.secondary' }} />
             <Box>
               <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                 Uploaded Documents
@@ -147,13 +147,13 @@ export default function SettingsPage() {
               variant="outlined"
               sx={{
                 p: 2,
-                '&:hover': { bgcolor: 'grey.50' },
+                '&:hover': { bgcolor: 'rgba(96, 165, 250, 0.06)' },
                 '&:hover .doc-actions': { opacity: 1 },
               }}
             >
               <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
                 <Stack direction="row" spacing={1.5} alignItems="center" sx={{ flex: 1 }}>
-                  <FileIcon sx={{ fontSize: 20, color: '#282E37' }} />
+                  <FileIcon sx={{ fontSize: 20, color: 'text.secondary' }} />
                   <Box sx={{ flex: 1 }}>
                     {editingDocId === doc.id ? (
                       <TextField
@@ -218,7 +218,7 @@ export default function SettingsPage() {
       <Box>
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
           <Stack direction="row" spacing={1.5} alignItems="center">
-            <WebIcon sx={{ fontSize: 24, color: '#282E37' }} />
+            <WebIcon sx={{ fontSize: 24, color: 'text.secondary' }} />
             <Box>
               <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                 External Sources
@@ -240,7 +240,7 @@ export default function SettingsPage() {
 
         {/* Add new source form */}
         {isAddingSource && (
-          <Paper variant="outlined" sx={{ p: 2, mb: 2, bgcolor: 'grey.50' }}>
+          <Paper variant="outlined" sx={{ p: 2, mb: 2, bgcolor: 'rgba(13, 17, 23, 0.5)' }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
               Add New Source
             </Typography>
@@ -302,14 +302,14 @@ export default function SettingsPage() {
               variant="outlined"
               sx={{
                 p: 2,
-                '&:hover': { bgcolor: 'grey.50' },
+                '&:hover': { bgcolor: 'rgba(96, 165, 250, 0.06)' },
                 '&:hover .source-actions': { opacity: 1 },
               }}
             >
               <Stack direction="row" spacing={2} alignItems="flex-start" justifyContent="space-between">
                 <Stack direction="row" spacing={1.5} alignItems="flex-start" sx={{ flex: 1 }}>
                   <Box sx={{ mt: 0.25 }}>
-                    {typeIcons[source.type] || <WebIcon sx={{ fontSize: 20, color: '#282E37' }} />}
+                    {typeIcons[source.type] || <WebIcon sx={{ fontSize: 20, color: 'text.secondary' }} />}
                   </Box>
                   <Box sx={{ flex: 1 }}>
                     {editingSourceId === source.id ? (
@@ -357,7 +357,7 @@ export default function SettingsPage() {
                               target="_blank"
                               sx={{ p: 0.25 }}
                             >
-                              <ExternalLinkIcon sx={{ fontSize: 14, color: '#282E37' }} />
+                              <ExternalLinkIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
                             </IconButton>
                           )}
                         </Stack>

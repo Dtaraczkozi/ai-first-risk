@@ -113,7 +113,7 @@ export function ApprovalCard({ request, onApprove, onReject, onViewDetails }: Ap
           {request.description}
         </Typography>
         
-        <Box sx={{ backgroundColor: 'grey.50', borderRadius: 1, p: 2, mb: 2 }}>
+        <Box sx={{ backgroundColor: 'rgba(13, 17, 23, 0.5)', borderRadius: 1, p: 2, mb: 2, border: '1px solid rgba(96, 165, 250, 0.08)' }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
             AI Reasoning
           </Typography>

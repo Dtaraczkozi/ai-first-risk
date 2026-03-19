@@ -46,6 +46,7 @@ export interface RiskSuggestion {
   reasoning: string;
   sources: DataSource[];
   status: 'pending' | 'approved' | 'rejected' | 'modified';
+  assessmentStatus?: 'unassessed' | 'in_progress' | 'assessed';
   suggestedOwner?: SuggestedOwner;
   mitigation?: Mitigation;
   userFeedback?: string;

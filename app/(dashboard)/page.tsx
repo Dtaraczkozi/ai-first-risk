@@ -971,7 +971,7 @@ function RiskDiscoveryContent() {
                             <Grid size={{ xs: 4 }}>
                               <Stack spacing={0.5}>
                                 <Stack direction="row" spacing={0.75} alignItems="center">
-                                  <CompetitorIcon sx={{ fontSize: 16, color: '#282E37' }} />
+                                  <CompetitorIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
                                   <Typography variant="caption" color="text.secondary">Competitors</Typography>
                                 </Stack>
                                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
@@ -982,7 +982,7 @@ function RiskDiscoveryContent() {
                             <Grid size={{ xs: 4 }}>
                               <Stack spacing={0.5}>
                                 <Stack direction="row" spacing={0.75} alignItems="center">
-                                  <NewsIcon sx={{ fontSize: 16, color: '#282E37' }} />
+                                  <NewsIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
                                   <Typography variant="caption" color="text.secondary">News</Typography>
                                 </Stack>
                                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
@@ -993,7 +993,7 @@ function RiskDiscoveryContent() {
                             <Grid size={{ xs: 4 }}>
                               <Stack spacing={0.5}>
                                 <Stack direction="row" spacing={0.75} alignItems="center">
-                                  <RegulatoryIcon sx={{ fontSize: 16, color: '#282E37' }} />
+                                  <RegulatoryIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
                                   <Typography variant="caption" color="text.secondary">Regulatory</Typography>
                                 </Stack>
                                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
@@ -1017,9 +1017,9 @@ function RiskDiscoveryContent() {
                   {(() => {
                     const externalRisks = suggestions.filter(s => s.sources?.some(src => src.type !== 'document'));
                     const sourceGroupLabels: Record<string, { label: string; icon: React.ReactNode }> = {
-                      competitor: { label: 'Competitor intelligence', icon: <CompetitorIcon sx={{ fontSize: 18, color: '#282E37' }} /> },
-                      news: { label: 'News & media', icon: <NewsIcon sx={{ fontSize: 18, color: '#282E37' }} /> },
-                      regulatory: { label: 'Regulatory & market trends', icon: <RegulatoryIcon sx={{ fontSize: 18, color: '#282E37' }} /> },
+                      competitor: { label: 'Competitor intelligence', icon: <CompetitorIcon sx={{ fontSize: 18, color: 'text.secondary' }} /> },
+                      news: { label: 'News & media', icon: <NewsIcon sx={{ fontSize: 18, color: 'text.secondary' }} /> },
+                      regulatory: { label: 'Regulatory & market trends', icon: <RegulatoryIcon sx={{ fontSize: 18, color: 'text.secondary' }} /> },
                     };
                     const sourceGroups = externalSourceGroups.map(group => ({
                       ...group,
@@ -1052,12 +1052,12 @@ function RiskDiscoveryContent() {
                               cursor: 'pointer',
                               transition: 'all 0.2s',
                               ...(isSelected && {
-                                bgcolor: 'primary.50',
+                                bgcolor: 'rgba(96, 165, 250, 0.1)',
                                 borderColor: 'primary.main',
                                 borderWidth: 2,
                               }),
                               '&:hover': { 
-                                bgcolor: isSelected ? 'primary.50' : 'grey.50',
+                                bgcolor: isSelected ? 'rgba(96, 165, 250, 0.1)' : 'rgba(96, 165, 250, 0.06)',
                                 borderColor: 'primary.main',
                               },
                             }}
@@ -1277,7 +1277,7 @@ function RiskDiscoveryContent() {
                                     px: 0.5,
                                     fontWeight: 600,
                                     fontSize: '0.875rem',
-                                    bgcolor: 'grey.100',
+                                    bgcolor: 'rgba(30, 40, 60, 0.8)',
                                     borderRadius: 0.5,
                                   },
                                 }}

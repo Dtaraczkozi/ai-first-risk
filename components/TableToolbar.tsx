@@ -130,7 +130,7 @@ export function TableToolbar({
                 color: 'text.secondary',
                 fontWeight: 500,
                 textTransform: 'none',
-                '&:hover': { bgcolor: 'grey.100' },
+                '&:hover': { bgcolor: 'rgba(96, 165, 250, 0.08)' },
               }}
             >
               Filter
@@ -240,7 +240,7 @@ export function TableToolbar({
                 color: 'text.secondary',
                 fontWeight: 500,
                 textTransform: 'none',
-                '&:hover': { bgcolor: 'grey.100' },
+                '&:hover': { bgcolor: 'rgba(96, 165, 250, 0.08)' },
               }}
             >
               Columns

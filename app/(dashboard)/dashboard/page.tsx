@@ -115,7 +115,7 @@ function ActionCard({
       <Stack direction="row" spacing={2} alignItems="flex-start" sx={{ mb: 2 }}>
         <Box
           sx={{
-            color: '#282E37',
+            color: 'text.secondary',
           }}
         >
           {icon}
@@ -181,9 +181,10 @@ function ConversationalInput() {
     <Paper 
       sx={{ 
         p: 3, 
-        background: 'linear-gradient(135deg, rgba(92, 107, 192, 0.03) 0%, rgba(156, 39, 176, 0.03) 50%, rgba(233, 30, 99, 0.03) 100%)',
-        border: '1px solid',
-        borderColor: 'divider',
+        background: 'linear-gradient(135deg, rgba(92, 107, 192, 0.08) 0%, rgba(99, 102, 241, 0.06) 50%, rgba(167, 139, 250, 0.08) 100%)',
+        border: '1px solid rgba(99, 102, 241, 0.2)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
       }}
     >
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
@@ -277,7 +278,7 @@ function ConversationalInput() {
 
       <Box>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
-          <LightbulbIcon sx={{ fontSize: 16, color: '#282E37' }} />
+          <LightbulbIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
           <Typography variant="caption" color="text.secondary">
             Try asking
           </Typography>
@@ -291,12 +292,11 @@ function ConversationalInput() {
               onClick={() => handlePromptClick(prompt)}
               sx={{
                 cursor: 'pointer',
-                bgcolor: 'background.paper',
-                border: '1px solid',
-                borderColor: 'divider',
+                bgcolor: 'rgba(22, 27, 39, 0.6)',
+                border: '1px solid rgba(96, 165, 250, 0.15)',
                 '&:hover': {
                   borderColor: 'primary.main',
-                  bgcolor: 'primary.50',
+                  bgcolor: 'rgba(96, 165, 250, 0.1)',
                 },
               }}
             />
@@ -386,8 +386,8 @@ export default function DashboardPage() {
                 href="/?new=true"
                 variant="outlined"
                 fullWidth
-                startIcon={<AgentIcon sx={{ color: '#282E37' }} />}
-                sx={{ py: 1.5, justifyContent: 'flex-start', color: '#282E37', borderColor: 'divider' }}
+                startIcon={<AgentIcon />}
+                sx={{ py: 1.5, justifyContent: 'flex-start' }}
               >
                 Run AI analysis
               </Button>
@@ -398,8 +398,8 @@ export default function DashboardPage() {
                 href="/risks"
                 variant="outlined"
                 fullWidth
-                startIcon={<WarningIcon sx={{ color: '#282E37' }} />}
-                sx={{ py: 1.5, justifyContent: 'flex-start', color: '#282E37', borderColor: 'divider' }}
+                startIcon={<WarningIcon />}
+                sx={{ py: 1.5, justifyContent: 'flex-start' }}
               >
                 Review high risks
               </Button>
@@ -410,8 +410,8 @@ export default function DashboardPage() {
                 href="/risks"
                 variant="outlined"
                 fullWidth
-                startIcon={<AssessmentIcon sx={{ color: '#282E37' }} />}
-                sx={{ py: 1.5, justifyContent: 'flex-start', color: '#282E37', borderColor: 'divider' }}
+                startIcon={<AssessmentIcon />}
+                sx={{ py: 1.5, justifyContent: 'flex-start' }}
               >
                 Pending assessments
               </Button>
@@ -422,8 +422,8 @@ export default function DashboardPage() {
                 href="/history"
                 variant="outlined"
                 fullWidth
-                startIcon={<TrendingUpIcon sx={{ color: '#282E37' }} />}
-                sx={{ py: 1.5, justifyContent: 'flex-start', color: '#282E37', borderColor: 'divider' }}
+                startIcon={<TrendingUpIcon />}
+                sx={{ py: 1.5, justifyContent: 'flex-start' }}
               >
                 View history
               </Button>

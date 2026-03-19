@@ -22,7 +22,7 @@ export default function DashboardLayout({
           sx={{
             flexGrow: 1,
             mt: `${HEADER_HEIGHT}px`,
-            backgroundColor: 'grey.50',
+            background: 'transparent',
             minHeight: `calc(100vh - ${HEADER_HEIGHT}px)`,
             px: { xs: 2, sm: '4%', md: '6%', lg: '8%', xl: '10%' },
             py: 3,

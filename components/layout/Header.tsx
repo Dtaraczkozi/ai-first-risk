@@ -39,11 +39,13 @@ export function Header({ title = 'Risk Discovery', alertCount = 0 }: HeaderProps
   return (
     <AppBar
       position="fixed"
-      color="inherit"
       elevation={0}
       sx={{
-        borderBottom: '1px solid',
-        borderColor: 'divider',
+        background: 'rgba(13, 17, 23, 0.75)',
+        backdropFilter: 'blur(20px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+        borderBottom: '1px solid rgba(96, 165, 250, 0.1)',
+        boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3)',
         ml: '240px',
         width: 'calc(100% - 240px)',
       }}

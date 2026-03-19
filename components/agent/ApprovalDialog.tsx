@@ -119,7 +119,7 @@ export function ApprovalDialog({ open, request, action, onClose, onConfirm }: Ap
           </Typography>
           <Box
             sx={{
-              backgroundColor: 'grey.50',
+              backgroundColor: 'rgba(13, 17, 23, 0.6)',
               borderRadius: 1,
               p: 2,
               fontFamily: 'monospace',

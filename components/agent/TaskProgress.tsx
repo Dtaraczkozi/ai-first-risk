@@ -65,7 +65,7 @@ export function TaskProgress({ task }: TaskProgressProps) {
       sx={{
         p: 2,
         borderColor: isRunning ? 'primary.main' : 'divider',
-        backgroundColor: isRunning ? 'primary.50' : 'background.paper',
+        backgroundColor: isRunning ? 'rgba(96, 165, 250, 0.1)' : 'background.paper',
       }}
     >
       <Stack direction="row" spacing={2} alignItems="center">
@@ -77,8 +77,8 @@ export function TaskProgress({ task }: TaskProgressProps) {
             width: 40,
             height: 40,
             borderRadius: 1,
-            backgroundColor: isRunning ? 'primary.main' : 'grey.100',
-            color: isRunning ? 'white' : 'grey.600',
+            backgroundColor: isRunning ? 'primary.main' : 'rgba(30, 40, 60, 0.8)',
+            color: isRunning ? 'white' : 'text.secondary',
           }}
         >
           {taskTypeIcons[task.type]}

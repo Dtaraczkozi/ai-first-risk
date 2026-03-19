@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0d1117;
+  --foreground: #e2e8f0;
 }
 
 @theme inline {
@@ -12,15 +12,62 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
-  background: var(--background);
+  /*
+   * Layered radial-gradient parallax background.
+   * background-attachment: fixed pins the gradient to the viewport — as content scrolls,
+   * the gradient stays put, creating natural parallax depth behind glass panels.
+   *
+   * Layer 1 (bottom): solid base
+   * Layer 2: large central ellipse — slightly brighter blue-navy core ("brighter middle")
+   * Layer 3: top-left blue accent orb
+   * Layer 4: bottom-right indigo accent orb
+   */
+  background:
+    radial-gradient(ellipse 110% 70% at 50% 42%, rgba(20, 48, 105, 0.48) 0%, transparent 62%),
+    radial-gradient(ellipse 55% 40% at 14% 10%, rgba(50, 100, 210, 0.12) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 45% at 86% 90%, rgba(80, 55, 190, 0.09) 0%, transparent 55%),
+    #0d1117;
+  background-attachment: fixed;
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/*
+ * Global focus-visible ring — WCAG 2.4.7 (Focus Visible) + 2.4.11 (Focus Appearance)
+ * #60a5fa on dark bg → 7.7:1, well above 3:1 minimum for focus indicators.
+ * Using :focus-visible keeps it keyboard-only, avoiding outline on mouse click.
+ * MUI components handle this via Mui-focusVisible class; this covers native elements.
+ */
+:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 2px;
+}
+
+/* Remove outline on mouse focus for native elements (mirrors MUI Mui-focusVisible behavior) */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(96, 165, 250, 0.3) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(96, 165, 250, 0.3);
+  border-radius: 3px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(96, 165, 250, 0.5);
 }

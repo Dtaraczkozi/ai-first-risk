@@ -134,7 +134,7 @@ export function RiskSuggestionCard({ suggestion, onApprove, onReject }: RiskSugg
         </Stack>
 
         {suggestion.mitigation && (
-          <Box sx={{ backgroundColor: 'grey.50', p: 1.5, borderRadius: 1, mb: 1 }}>
+          <Box sx={{ backgroundColor: 'rgba(13, 17, 23, 0.5)', p: 1.5, borderRadius: 1, mb: 1, border: '1px solid rgba(96, 165, 250, 0.08)' }}>
             <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
               Mitigation ({suggestion.mitigation.controls.length} controls)
             </Typography>
