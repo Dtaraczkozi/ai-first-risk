@@ -515,6 +515,7 @@ function RiskDiscoveryContent() {
   const [sourcesDrawerOpen, setSourcesDrawerOpen] = useState(false);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [surveysExpanded, setSurveysExpanded] = useState(true);
+  const [externalIntelExpanded, setExternalIntelExpanded] = useState(true);
   const [dismissedSurveys, setDismissedSurveys] = useState<Set<number>>(new Set());
 
   // Single source of truth for external source groups (used by section cards and table filter)
@@ -1054,6 +1055,265 @@ function RiskDiscoveryContent() {
           </Collapse>
 
             <RiskSummaryStats suggestions={suggestions} approvedCount={approvedCount} />
+
+            {/* External Intelligence Section */}
+            <Box sx={{ mt: 2.5, mb: 1 }}>
+              <Stack
+                direction="row"
+                alignItems="center"
+                spacing={1}
+                onClick={() => setExternalIntelExpanded(prev => !prev)}
+                sx={{ cursor: 'pointer', mb: 1.5, userSelect: 'none' }}
+              >
+                <Typography variant="h6" component="h3" sx={{ fontWeight: 600 }}>
+                  External intelligence
+                </Typography>
+                <Chip
+                  size="small"
+                  label={`${Object.values(MOCK_SIGNALS).flat().length} signals`}
+                  sx={{ height: 20, fontSize: '0.75rem' }}
+                />
+                {externalIntelExpanded
+                  ? <ExpandLessIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+                  : <ExpandMoreIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+                }
+                <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto !important' }}>
+                  Sources that drove agent risk identification
+                </Typography>
+              </Stack>
+
+              <Collapse in={externalIntelExpanded}>
+                <Grid container spacing={2}>
+                  {/* Competitor Intelligence */}
+                  <Grid size={{ xs: 12, md: 4 }}>
+                    <Paper variant="outlined" sx={{ p: 2, height: '100%', borderColor: 'rgba(194,154,29,0.3)' }}>
+                      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
+                        <CompetitorIcon sx={{ fontSize: 16, color: '#C29A1D' }} />
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#C29A1D' }}>
+                          Competitor intelligence
+                        </Typography>
+                        <Chip size="small" label={MOCK_SIGNALS.competitor.length} sx={{ height: 18, fontSize: '0.7rem', ml: 'auto !important', bgcolor: 'rgba(194,154,29,0.12)', color: '#C29A1D', border: '1px solid rgba(194,154,29,0.3)' }} />
+                      </Stack>
+                      <Stack spacing={1.5}>
+                        {MOCK_SIGNALS.competitor.map((signal, i) => (
+                          <Box
+                            key={i}
+                            sx={{
+                              p: 1.5,
+                              borderRadius: 1,
+                              bgcolor: 'rgba(255,255,255,0.03)',
+                              border: '1px solid rgba(255,255,255,0.07)',
+                              '&:hover': { bgcolor: 'rgba(255,255,255,0.055)' },
+                            }}
+                          >
+                            <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 0.5 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.3, flex: 1, mr: 1 }}>
+                                {signal.title}
+                              </Typography>
+                              <Chip
+                                size="small"
+                                label={signal.relevance}
+                                sx={{
+                                  height: 18,
+                                  fontSize: '0.68rem',
+                                  flexShrink: 0,
+                                  bgcolor: signal.relevance === 'high' ? 'rgba(196,43,49,0.15)' : signal.relevance === 'medium' ? 'rgba(194,154,29,0.15)' : 'rgba(148,163,184,0.15)',
+                                  color: signal.relevance === 'high' ? '#E54E54' : signal.relevance === 'medium' ? '#C29A1D' : '#94a3b8',
+                                  border: `1px solid ${signal.relevance === 'high' ? 'rgba(196,43,49,0.3)' : signal.relevance === 'medium' ? 'rgba(194,154,29,0.3)' : 'rgba(148,163,184,0.3)'}`,
+                                }}
+                              />
+                            </Stack>
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75, lineHeight: 1.4 }}>
+                              {signal.description}
+                            </Typography>
+                            <Stack direction="row" justifyContent="space-between" alignItems="center">
+                              <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                                {signal.riskCategories.map(cat => (
+                                  <Chip
+                                    key={cat}
+                                    size="small"
+                                    label={cat}
+                                    sx={{
+                                      height: 16,
+                                      fontSize: '0.65rem',
+                                      bgcolor: `${categoryColors[cat]}22`,
+                                      color: categoryColors[cat],
+                                      border: `1px solid ${categoryColors[cat]}44`,
+                                    }}
+                                  />
+                                ))}
+                              </Stack>
+                              <Stack direction="row" alignItems="center" spacing={0.5}>
+                                <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.65rem' }}>
+                                  {signal.date}
+                                </Typography>
+                                <Tooltip title={`Open: ${signal.source}`}>
+                                  <IconButton size="small" component="a" href={signal.url} target="_blank" sx={{ p: 0.25 }}>
+                                    <OpenInNewIcon sx={{ fontSize: 12, color: 'text.disabled' }} />
+                                  </IconButton>
+                                </Tooltip>
+                              </Stack>
+                            </Stack>
+                          </Box>
+                        ))}
+                      </Stack>
+                    </Paper>
+                  </Grid>
+
+                  {/* Industry News */}
+                  <Grid size={{ xs: 12, md: 4 }}>
+                    <Paper variant="outlined" sx={{ p: 2, height: '100%', borderColor: 'rgba(0,96,199,0.3)' }}>
+                      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
+                        <NewsIcon sx={{ fontSize: 16, color: '#0060C7' }} />
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#0060C7' }}>
+                          Industry news
+                        </Typography>
+                        <Chip size="small" label={MOCK_SIGNALS.news.length} sx={{ height: 18, fontSize: '0.7rem', ml: 'auto !important', bgcolor: 'rgba(0,96,199,0.12)', color: '#60a5fa', border: '1px solid rgba(0,96,199,0.3)' }} />
+                      </Stack>
+                      <Stack spacing={1.5}>
+                        {MOCK_SIGNALS.news.map((signal, i) => (
+                          <Box
+                            key={i}
+                            sx={{
+                              p: 1.5,
+                              borderRadius: 1,
+                              bgcolor: 'rgba(255,255,255,0.03)',
+                              border: '1px solid rgba(255,255,255,0.07)',
+                              '&:hover': { bgcolor: 'rgba(255,255,255,0.055)' },
+                            }}
+                          >
+                            <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 0.5 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.3, flex: 1, mr: 1 }}>
+                                {signal.title}
+                              </Typography>
+                              <Chip
+                                size="small"
+                                label={signal.relevance}
+                                sx={{
+                                  height: 18,
+                                  fontSize: '0.68rem',
+                                  flexShrink: 0,
+                                  bgcolor: signal.relevance === 'high' ? 'rgba(196,43,49,0.15)' : signal.relevance === 'medium' ? 'rgba(194,154,29,0.15)' : 'rgba(148,163,184,0.15)',
+                                  color: signal.relevance === 'high' ? '#E54E54' : signal.relevance === 'medium' ? '#C29A1D' : '#94a3b8',
+                                  border: `1px solid ${signal.relevance === 'high' ? 'rgba(196,43,49,0.3)' : signal.relevance === 'medium' ? 'rgba(194,154,29,0.3)' : 'rgba(148,163,184,0.3)'}`,
+                                }}
+                              />
+                            </Stack>
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75, lineHeight: 1.4 }}>
+                              {signal.description}
+                            </Typography>
+                            <Stack direction="row" justifyContent="space-between" alignItems="center">
+                              <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                                {signal.riskCategories.map(cat => (
+                                  <Chip
+                                    key={cat}
+                                    size="small"
+                                    label={cat}
+                                    sx={{
+                                      height: 16,
+                                      fontSize: '0.65rem',
+                                      bgcolor: `${categoryColors[cat]}22`,
+                                      color: categoryColors[cat],
+                                      border: `1px solid ${categoryColors[cat]}44`,
+                                    }}
+                                  />
+                                ))}
+                              </Stack>
+                              <Stack direction="row" alignItems="center" spacing={0.5}>
+                                <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.65rem' }}>
+                                  {signal.date}
+                                </Typography>
+                                <Tooltip title={`Open: ${signal.source}`}>
+                                  <IconButton size="small" component="a" href={signal.url} target="_blank" sx={{ p: 0.25 }}>
+                                    <OpenInNewIcon sx={{ fontSize: 12, color: 'text.disabled' }} />
+                                  </IconButton>
+                                </Tooltip>
+                              </Stack>
+                            </Stack>
+                          </Box>
+                        ))}
+                      </Stack>
+                    </Paper>
+                  </Grid>
+
+                  {/* Regulatory Updates */}
+                  <Grid size={{ xs: 12, md: 4 }}>
+                    <Paper variant="outlined" sx={{ p: 2, height: '100%', borderColor: 'rgba(149,48,220,0.3)' }}>
+                      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
+                        <RegulatoryIcon sx={{ fontSize: 16, color: '#9530DC' }} />
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#9530DC' }}>
+                          Regulatory updates
+                        </Typography>
+                        <Chip size="small" label={MOCK_SIGNALS.regulatory.length} sx={{ height: 18, fontSize: '0.7rem', ml: 'auto !important', bgcolor: 'rgba(149,48,220,0.12)', color: '#c084fc', border: '1px solid rgba(149,48,220,0.3)' }} />
+                      </Stack>
+                      <Stack spacing={1.5}>
+                        {MOCK_SIGNALS.regulatory.map((signal, i) => (
+                          <Box
+                            key={i}
+                            sx={{
+                              p: 1.5,
+                              borderRadius: 1,
+                              bgcolor: 'rgba(255,255,255,0.03)',
+                              border: '1px solid rgba(255,255,255,0.07)',
+                              '&:hover': { bgcolor: 'rgba(255,255,255,0.055)' },
+                            }}
+                          >
+                            <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 0.5 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.3, flex: 1, mr: 1 }}>
+                                {signal.title}
+                              </Typography>
+                              <Chip
+                                size="small"
+                                label={signal.relevance}
+                                sx={{
+                                  height: 18,
+                                  fontSize: '0.68rem',
+                                  flexShrink: 0,
+                                  bgcolor: signal.relevance === 'high' ? 'rgba(196,43,49,0.15)' : signal.relevance === 'medium' ? 'rgba(194,154,29,0.15)' : 'rgba(148,163,184,0.15)',
+                                  color: signal.relevance === 'high' ? '#E54E54' : signal.relevance === 'medium' ? '#C29A1D' : '#94a3b8',
+                                  border: `1px solid ${signal.relevance === 'high' ? 'rgba(196,43,49,0.3)' : signal.relevance === 'medium' ? 'rgba(194,154,29,0.3)' : 'rgba(148,163,184,0.3)'}`,
+                                }}
+                              />
+                            </Stack>
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75, lineHeight: 1.4 }}>
+                              {signal.description}
+                            </Typography>
+                            <Stack direction="row" justifyContent="space-between" alignItems="center">
+                              <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                                {signal.riskCategories.map(cat => (
+                                  <Chip
+                                    key={cat}
+                                    size="small"
+                                    label={cat}
+                                    sx={{
+                                      height: 16,
+                                      fontSize: '0.65rem',
+                                      bgcolor: `${categoryColors[cat]}22`,
+                                      color: categoryColors[cat],
+                                      border: `1px solid ${categoryColors[cat]}44`,
+                                    }}
+                                  />
+                                ))}
+                              </Stack>
+                              <Stack direction="row" alignItems="center" spacing={0.5}>
+                                <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.65rem' }}>
+                                  {signal.date}
+                                </Typography>
+                                <Tooltip title={`Open: ${signal.source}`}>
+                                  <IconButton size="small" component="a" href={signal.url} target="_blank" sx={{ p: 0.25 }}>
+                                    <OpenInNewIcon sx={{ fontSize: 12, color: 'text.disabled' }} />
+                                  </IconButton>
+                                </Tooltip>
+                              </Stack>
+                            </Stack>
+                          </Box>
+                        ))}
+                      </Stack>
+                    </Paper>
+                  </Grid>
+                </Grid>
+              </Collapse>
+            </Box>
 
             {/* Risk Suggestions Section */}
             <Box ref={tableRef}>
