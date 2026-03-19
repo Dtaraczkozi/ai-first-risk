@@ -674,18 +674,18 @@ export function AssessmentDetailPanel({ group, onClose, onStart, allRisks = [] }
               <Chip size="small" label={assessors.length} sx={{ height: 18, fontSize: '0.7rem', ml: 0.5 }} />
             </Stack>
           </AccordionSummary>
-          <AccordionDetails sx={{ px: 2.5, pb: 2.5, pt: 0 }}>
-            <Divider sx={{ borderColor: 'rgba(96,165,250,0.08)', mb: 2 }} />
+          <AccordionDetails sx={{ px: 2.5, pb: 2, pt: 0 }}>
+            <Divider sx={{ borderColor: 'rgba(96,165,250,0.08)', mb: 1.5 }} />
 
             <Stack spacing={1}>
-              {/* Compact assessor cards — detail on hover */}
+              <Stack direction="row" flexWrap="wrap" gap={0.75}>
               {assessors.map((assessor) => {
                 const color = ownerColors[assessor.name] || '#6B7280';
                 const initials = assessor.name.split(' ').map(n => n[0]).join('');
                 return (
                   <Tooltip
                     key={assessor.name}
-                    placement="left"
+                    placement="top"
                     arrow
                     title={<AssessorTooltipContent assessor={assessor} />}
                     componentsProps={{
@@ -703,60 +703,33 @@ export function AssessmentDetailPanel({ group, onClose, onStart, allRisks = [] }
                       arrow: { sx: { color: 'rgba(14,22,38,0.97)' } },
                     }}
                   >
-                    <Stack
-                      direction="row"
-                      spacing={1.25}
-                      alignItems="center"
+                    <Chip
+                      size="small"
+                      avatar={
+                        <Avatar sx={{ bgcolor: `${color} !important`, fontSize: '0.6rem !important', fontWeight: 700 }}>
+                          {initials}
+                        </Avatar>
+                      }
+                      label={assessor.name}
+                      onDelete={() => setLocalAssessors(prev => prev.filter(a => a.name !== assessor.name))}
                       sx={{
-                        px: 1.5, py: 1, borderRadius: 1.5, cursor: 'default',
-                        border: '1px solid rgba(96,165,250,0.08)',
-                        background: 'rgba(14,20,35,0.4)',
-                        transition: 'border-color 0.15s',
-                        '&:hover': { borderColor: 'rgba(96,165,250,0.22)' },
+                        height: 26,
+                        fontSize: '0.75rem',
+                        bgcolor: 'rgba(14,20,35,0.5)',
+                        border: '1px solid rgba(96,165,250,0.12)',
+                        color: 'text.primary',
+                        '&:hover': { borderColor: 'rgba(96,165,250,0.28)', bgcolor: 'rgba(14,20,35,0.7)' },
+                        '& .MuiChip-deleteIcon': { fontSize: 13, color: 'text.disabled', '&:hover': { color: '#f87171' } },
                       }}
-                    >
-                      <Avatar sx={{ width: 28, height: 28, fontSize: '0.7rem', fontWeight: 700, bgcolor: color, flexShrink: 0 }}>
-                        {initials}
-                      </Avatar>
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.25 }}>{assessor.name}</Typography>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>{assessor.role}</Typography>
-                      </Box>
-                      {assessor.riskCount > 0 && (
-                        <Chip size="small"
-                          label={`${assessor.riskCount} ${assessor.riskCount === 1 ? 'risk' : 'risks'}`}
-                          sx={{ height: 18, fontSize: '0.75rem', bgcolor: 'rgba(96,165,250,0.1)', border: 'none', flexShrink: 0 }}
-                        />
-                      )}
-                      <Tooltip title="Remove assessor" placement="top">
-                        <IconButton
-                          size="small"
-                          onClick={(e) => { e.stopPropagation(); setLocalAssessors(prev => prev.filter(a => a.name !== assessor.name)); }}
-                          sx={{ p: 0.25, color: 'text.disabled', '&:hover': { color: '#f87171' }, flexShrink: 0 }}
-                        >
-                          <CloseIcon sx={{ fontSize: 13 }} />
-                        </IconButton>
-                      </Tooltip>
-                    </Stack>
+                    />
                   </Tooltip>
                 );
               })}
+              </Stack>
 
-              {/* Add assessor */}
-              {!showAssessorDropdown ? (
-                <Button
-                  size="small"
-                  startIcon={<PersonAddIcon sx={{ fontSize: 15 }} />}
-                  onClick={() => setShowAssessorDropdown(true)}
-                  sx={{
-                    mt: 0.5, color: 'text.secondary', textTransform: 'none', fontSize: '0.78rem',
-                    justifyContent: 'flex-start', '&:hover': { color: 'primary.light' },
-                  }}
-                >
-                  Add assessor
-                </Button>
-              ) : (
-                <Box sx={{ mt: 0.5 }}>
+              {/* Add assessor search — opened from header button */}
+              {showAssessorDropdown && (
+                <Box sx={{ mt: 0.5, width: '100%' }}>
                   <TextField
                     size="small"
                     fullWidth
