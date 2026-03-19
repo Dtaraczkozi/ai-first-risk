@@ -395,6 +395,21 @@ export function AssessmentDetailPanel({ group, onClose, onStart, allRisks = [] }
               onClick={() => { onStart(); onClose(); }}>
               Start assessment
             </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<PersonAddIcon sx={{ fontSize: 15 }} />}
+              onClick={() => setShowAssessorDropdown(true)}
+              sx={{
+                textTransform: 'none',
+                fontSize: '0.78rem',
+                borderColor: 'rgba(96,165,250,0.3)',
+                color: 'text.secondary',
+                '&:hover': { borderColor: 'rgba(96,165,250,0.6)', color: 'primary.light' },
+              }}
+            >
+              Add assessor
+            </Button>
             <IconButton size="small" onClick={onClose}
               sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
               aria-label="Close">
