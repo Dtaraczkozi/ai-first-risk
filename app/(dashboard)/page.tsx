@@ -1375,7 +1375,6 @@ function RiskDiscoveryContent() {
                     {visibleColumns.includes('risk') && <TableCell>Risk</TableCell>}
                     <TableCell sx={{ width: 44, color: 'text.secondary' }}>Source</TableCell>
                     <TableCell sx={{ color: 'text.secondary' }}>Confidence</TableCell>
-                    <TableCell sx={{ color: 'text.secondary' }}>Flag</TableCell>
                     {visibleColumns.includes('category') && <TableCell>Category</TableCell>}
                     {visibleColumns.includes('score') && <TableCell>Inherent score</TableCell>}
                     {visibleColumns.includes('owner') && <TableCell>Owner</TableCell>}
@@ -1430,6 +1429,9 @@ function RiskDiscoveryContent() {
                         const recentIds = suggestions.slice(0, 6).map(r => r.id);
                         if (!recentIds.includes(risk.id)) return false;
                       }
+
+                      // Suppress duplicates — matched against existing register
+                      if (isDuplicate(risk.title)) return false;
                       
                       return true;
                     });
@@ -1598,11 +1600,6 @@ function RiskDiscoveryContent() {
                               sx={{ height: 20, fontSize: '0.75rem' }}
                             />
                           </TableCell>
-                          <TableCell>
-                            {duplicate && (
-                              <Chip size="small" label="DUPLICATE" color="warning" variant="outlined" sx={{ height: 20, fontSize: '0.7rem' }} />
-                            )}
-                          </TableCell>
                           {visibleColumns.includes('category') && (
                             <TableCell sx={{ minWidth: 130 }}>
                               <Select
@@ -1759,17 +1756,9 @@ function RiskDiscoveryContent() {
                           {visibleColumns.includes('actions') && (
                             <TableCell align="right" onClick={(e) => e.stopPropagation()}>
                               <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                                {duplicate ? (
-                                  <Tooltip title="Merge">
-                                    <IconButton size="small" color="warning" onClick={() => handleApprove(risk.id)}>
-                                      <MergeIcon fontSize="small" />
-                                    </IconButton>
-                                  </Tooltip>
-                                ) : (
-                                  <IconButton size="small" color="success" onClick={() => handleApprove(risk.id)} title="Approve">
+                                <IconButton size="small" color="success" onClick={() => handleApprove(risk.id)} title="Approve">
                                     <ApproveIcon fontSize="small" />
                                   </IconButton>
-                                )}
                                 <IconButton size="small" color="error" onClick={() => handleReject(risk.id)} title="Reject">
                                   <RejectIcon fontSize="small" />
                                 </IconButton>
