@@ -121,7 +121,7 @@ export default function AssessmentResultsPage({ params }: { params: Promise<{ gr
   const synthScore = (synthesis.synthesisedLikelihood + synthesis.synthesisedImpact) / 2;
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box>
       {/* Breadcrumb + header */}
       <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
         <Button component={Link} href="/assessments" variant="text" size="small" startIcon={<BackIcon />}>

@@ -453,17 +453,19 @@ export default function RiskDetailPage({ params }: { params: Promise<{ id: strin
 
   return (
     <Box>
-      <Box sx={{ mb: 2 }}>
+      <Box sx={{ mb: 6 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
           <Box>
-            <Typography variant="caption" color="text.secondary">
-              Risk manager
-            </Typography>
-            <Stack direction="row" alignItems="center" spacing={2} sx={{ mt: 0.5 }}>
-              <IconButton onClick={() => router.back()} size="small" sx={{ ml: -1 }}>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+              <IconButton onClick={() => router.back()} size="small" sx={{ ml: -0.5 }}>
                 <BackIcon />
               </IconButton>
-              <Typography variant="h4" component="h1" sx={{ fontWeight: 600 }}>
+              <Typography variant="caption" color="text.secondary">
+                Risk manager
+              </Typography>
+            </Stack>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Typography variant="h1" component="h1">
                 {title || risk.title}
               </Typography>
               {(() => {
@@ -486,7 +488,7 @@ export default function RiskDetailPage({ params }: { params: Promise<{ id: strin
                 );
               })()}
             </Stack>
-            <Stack direction="row" spacing={2} sx={{ mt: 0.5, ml: 5 }}>
+            <Stack direction="row" spacing={2} sx={{ mt: 0.75, ml: 0 }}>
               <Typography variant="caption" color="text.secondary">
                 Id: RSK-{id.split('-')[1] || '001'}
               </Typography>

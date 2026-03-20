@@ -745,7 +745,7 @@ export default function DashboardPage() {
   const summaryUrgent = highSev.length > 0 || redKRIs.length > 0;
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box>
       {/* ── Header ── */}
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 6 }}>
         <Typography variant="h1" component="h1">Dashboard</Typography>

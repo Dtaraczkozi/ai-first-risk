@@ -33,9 +33,9 @@ const analysisHistory: AnalysisHistoryItem[] = [];
 export default function HistoryPage() {
   return (
     <Box>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 6 }}>
         <Box>
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 600 }}>
+          <Typography variant="h1" component="h1">
             History
           </Typography>
           <Typography variant="body2" color="text.secondary">

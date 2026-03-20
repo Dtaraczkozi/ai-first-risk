@@ -630,11 +630,11 @@ export default function KRIsPage() {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box>
       {/* ── Header ── */}
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2.5 }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 6 }}>
         <Box>
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 600 }}>
+          <Typography variant="h1" component="h1">
             Key risk indicators
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
@@ -663,7 +663,7 @@ export default function KRIsPage() {
       </Stack>
 
       {/* ── Stats strip ── */}
-      <Grid container spacing={1.5} sx={{ mb: 2.5 }}>
+      <Grid container spacing={3} sx={{ mb: 6 }}>
         {[
           {
             label: 'Total KRIs',
@@ -713,7 +713,7 @@ export default function KRIsPage() {
           <Grid key={stat.label} size={{ xs: 6, sm: 4, md: 2 }}>
             <Paper variant="outlined" sx={{ p: 1.5, bgcolor: stat.accent, height: '100%' }}>
               <Stack direction="row" spacing={0.5} alignItems="center">
-                <Typography variant="h5" sx={{ fontWeight: 700, color: stat.color, lineHeight: 1.1 }}>
+                <Typography sx={{ fontSize: '32px', fontWeight: 700, color: stat.color, lineHeight: 1 }}>
                   {stat.value}
                 </Typography>
                 {stat.icon}
