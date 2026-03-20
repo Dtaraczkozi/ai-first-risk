@@ -25,16 +25,26 @@ import {
   CircularProgress,
   Snackbar,
   Alert,
+  Divider,
 } from '@mui/material';
 import {
   ArrowBack as BackIcon,
   Close as CloseIcon,
   AutoAwesome as SparkleIcon,
   Check as ApproveIcon,
+  FlagOutlined as OutlierIcon,
+  AutoAwesome as AIBadgeIcon,
+  AttachFile as FileAttachIcon,
+  Verified as VerifiedIcon,
+  Info as InfoIcon,
+  OpenInNew as OpenInNewIcon,
 } from '@mui/icons-material';
+import Link from 'next/link';
 import { mockRiskSuggestions, additionalMockRisks } from '@/data/mock/analysis-session';
 import { getSeverityColor, RISK_CATEGORY_COLORS } from '@/lib/utils';
 import { getApprovedRisks, addApprovedRisk, getRiskById, updateDraftRisk, updateApprovedRisk } from '@/lib/risk-store';
+import { MOCK_SYNTHESISED_ASSESSMENTS } from '@/data/mock/synthesis';
+import type { SynthesisedAssessment } from '@/types/assessor-persona';
 
 const AI_GRADIENT = 'linear-gradient(135deg, #5C6BC0 0%, #9C27B0 50%, #E91E63 100%)';
 
@@ -819,11 +829,142 @@ export default function RiskDetailPage({ params }: { params: Promise<{ id: strin
       {!isDraft && (
         <>
           <TabPanel value={tabValue} index={2}>
-            <Paper variant="outlined" sx={{ p: 3 }}>
-              <Typography variant="body2" color="text.secondary">
-                No assessments configured yet.
-              </Typography>
-            </Paper>
+            {(() => {
+              const RESULTS_BY_CATEGORY: Record<string, number> = { cyber: 0, financial: 1, compliance: 2 };
+              const synthIdx = RESULTS_BY_CATEGORY[risk.category] ?? 0;
+              const synthesis: SynthesisedAssessment = MOCK_SYNTHESISED_ASSESSMENTS[synthIdx] ?? MOCK_SYNTHESISED_ASSESSMENTS[0];
+              const synthScore = (synthesis.synthesisedLikelihood + synthesis.synthesisedImpact) / 2;
+              const SCORE_COLOR: Record<number, string> = { 1: '#7ECDA0', 2: '#4ade80', 3: '#C29A1D', 4: '#E54E54', 5: '#C42B31' };
+              const SCORE_LABEL: Record<number, string> = { 1: 'Very low', 2: 'Low', 3: 'Medium', 4: 'High', 5: 'Very high' };
+              const getScoreColor = (v: number) => v >= 4.5 ? '#C42B31' : v >= 3.5 ? '#E54E54' : v >= 2.5 ? '#C29A1D' : v >= 1.5 ? '#4ade80' : '#7ECDA0';
+
+              return (
+                <Stack spacing={3}>
+                  {/* Summary card */}
+                  <Paper variant="outlined" sx={{ p: 2.5 }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
+                      <Typography variant="h3">Assessment summary</Typography>
+                      <Button component={Link} href={`/assessments/results/${encodeURIComponent(risk.category)}`}
+                        variant="outlined" size="small" endIcon={<OpenInNewIcon />}>
+                        Full results
+                      </Button>
+                    </Stack>
+                    <Stack direction="row" spacing={3} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+                      <Box>
+                        <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mb: 0.25 }}>Likelihood</Typography>
+                        <Typography variant="h3" sx={{ color: getScoreColor(synthesis.synthesisedLikelihood) }}>
+                          {synthesis.synthesisedLikelihood.toFixed(1)}
+                          <Typography component="span" variant="caption" color="text.disabled"> / 5</Typography>
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mb: 0.25 }}>Impact</Typography>
+                        <Typography variant="h3" sx={{ color: getScoreColor(synthesis.synthesisedImpact) }}>
+                          {synthesis.synthesisedImpact.toFixed(1)}
+                          <Typography component="span" variant="caption" color="text.disabled"> / 5</Typography>
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mb: 0.25 }}>Overall</Typography>
+                        <Typography variant="h3" sx={{ color: getScoreColor(synthScore) }}>
+                          {synthScore.toFixed(1)}
+                          <Typography component="span" variant="caption" color="text.disabled"> / 5</Typography>
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mb: 0.5 }}>Confidence</Typography>
+                        <Chip size="small" label={synthesis.confidenceLevel} variant="outlined" sx={{ height: 24 }} />
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mb: 0.25 }}>Assessors</Typography>
+                        <Typography variant="body2">{synthesis.opinions.length}</Typography>
+                      </Box>
+                      {synthesis.outlierFlags.length > 0 && (
+                        <Box>
+                          <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mb: 0.5 }}>Outliers</Typography>
+                          <Chip size="small" label={`${synthesis.outlierFlags.length} flagged`}
+                            icon={<OutlierIcon sx={{ fontSize: '11px !important', color: '#fbbf24 !important' }} />}
+                            sx={{ height: 22, fontSize: '0.72rem', bgcolor: 'rgba(251,191,36,0.1)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)' }} />
+                        </Box>
+                      )}
+                    </Stack>
+                    {synthesis.whatChangedSinceLastTime && (
+                      <Box sx={{ p: 1.5, borderRadius: 1, bgcolor: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.12)' }}>
+                        <Stack direction="row" spacing={0.75} alignItems="flex-start">
+                          <InfoIcon sx={{ fontSize: 14, color: '#60a5fa', mt: 0.1, flexShrink: 0 }} />
+                          <Typography variant="caption" color="text.secondary">{synthesis.whatChangedSinceLastTime}</Typography>
+                        </Stack>
+                      </Box>
+                    )}
+                  </Paper>
+
+                  {/* Per-assessor cards */}
+                  <Typography variant="h3">Individual assessor opinions</Typography>
+                  {synthesis.opinions.map((op) => {
+                    const isAI = op.assessorType === 'ai_persona';
+                    const score = Math.round((op.likelihood + op.impact) / 2);
+                    const isOutlier = synthesis.outlierFlags.includes(op.assessorId);
+                    const aiOwnerColors: Record<string, string> = { 'Sarah Chen': '#0060C7', 'Michael Torres': '#C42B31', 'Jennifer Walsh': '#9530DC', 'David Park': '#009999', 'Robert Kim': '#C29A1D' };
+
+                    return (
+                      <Paper key={op.assessorId} variant="outlined" sx={{
+                        p: 2,
+                        border: isOutlier ? '1px solid rgba(251,191,36,0.3)' : isAI ? '1px solid rgba(96,165,250,0.15)' : undefined,
+                        bgcolor: isAI ? 'rgba(96,165,250,0.03)' : undefined,
+                      }}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1.5 }}>
+                          <Stack direction="row" spacing={1.5} alignItems="center">
+                            <Avatar sx={{ width: 32, height: 32, fontSize: '0.72rem', bgcolor: isAI ? '#1e3a5f' : aiOwnerColors[op.assessorName] || '#374151' }}>
+                              {isAI ? '✦' : op.assessorName.split(' ').map(n => n[0]).join('')}
+                            </Avatar>
+                            <Box>
+                              <Stack direction="row" spacing={1} alignItems="center">
+                                <Typography variant="h4">{op.assessorName.replace(' Persona', '')}</Typography>
+                                {isOutlier && (
+                                  <Chip size="small" label="Outlier"
+                                    icon={<OutlierIcon sx={{ fontSize: '11px !important', color: '#fbbf24 !important' }} />}
+                                    sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'rgba(251,191,36,0.1)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)' }} />
+                                )}
+                              </Stack>
+                              <Stack direction="row" spacing={0.5} alignItems="center">
+                                {isAI && <AIBadgeIcon sx={{ fontSize: 10, color: '#60a5fa' }} />}
+                                <Typography variant="caption" color="text.disabled">{isAI ? 'AI assessor' : 'Human assessor'}</Typography>
+                              </Stack>
+                            </Box>
+                          </Stack>
+                          <Stack direction="row" spacing={1.5} alignItems="center">
+                            {[{ l: 'L', v: op.likelihood }, { l: 'I', v: op.impact }].map(s => (
+                              <Box key={s.l} sx={{ textAlign: 'center' }}>
+                                <Typography variant="caption" color="text.disabled" sx={{ display: 'block', fontSize: '0.65rem' }}>{s.l}</Typography>
+                                <Typography variant="h5" sx={{ color: SCORE_COLOR[s.v], fontWeight: 700 }}>{s.v}</Typography>
+                                <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.65rem' }}>{SCORE_LABEL[s.v]}</Typography>
+                              </Box>
+                            ))}
+                            <Box sx={{ textAlign: 'center' }}>
+                              <Typography variant="caption" color="text.disabled" sx={{ display: 'block', fontSize: '0.65rem' }}>Score</Typography>
+                              <Typography variant="h4" sx={{ color: SCORE_COLOR[score], fontWeight: 700 }}>{score}</Typography>
+                              <Chip size="small" label={op.confidence} variant="outlined" sx={{ height: 16, fontSize: '0.6rem', '& .MuiChip-label': { px: 0.5 } }} />
+                            </Box>
+                          </Stack>
+                        </Stack>
+                        <Divider sx={{ mb: 1.5 }} />
+                        <Box sx={{ p: 1.5, borderRadius: 1, bgcolor: 'rgba(0,0,0,0.15)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                          <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.disabled', display: 'block', mb: 0.5 }}>Written assessment</Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.65 }}>{op.rationale}</Typography>
+                        </Box>
+                        {isAI && (
+                          <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+                            <FileAttachIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
+                            <Chip size="small" label={`${op.assessorName.replace(' Persona', '').replace(' ', '_')}_Analysis.pdf`}
+                              variant="outlined" sx={{ height: 20, fontSize: '0.65rem', cursor: 'pointer' }} />
+                          </Stack>
+                        )}
+                      </Paper>
+                    );
+                  })}
+                </Stack>
+              );
+            })()}
           </TabPanel>
 
           <TabPanel value={tabValue} index={3}>

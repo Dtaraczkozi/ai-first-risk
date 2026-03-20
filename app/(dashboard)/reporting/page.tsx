@@ -225,15 +225,15 @@ function RiskHeatmap() {
       {/* Legend */}
       <Stack direction="row" spacing={1.5} sx={{ mt: 1.5, flexWrap: 'wrap', gap: 0.75 }}>
         {[
-          { label: 'Critical', color: '#C42B31' },
-          { label: 'High',     color: '#E54E54' },
-          { label: 'Medium',   color: '#C29A1D' },
-          { label: 'Low',      color: '#2EB365' },
-          { label: 'Very low', color: '#7ECDA0' },
+          { label: '5 — Very high', color: '#C42B31' },
+          { label: '4 — High',      color: '#E54E54' },
+          { label: '3 — Medium',    color: '#C29A1D' },
+          { label: '2 — Low',       color: '#2EB365' },
+          { label: '1 — Very low',  color: '#7ECDA0' },
         ].map(l => (
           <Stack key={l.label} direction="row" spacing={0.5} alignItems="center">
             <Box sx={{ width: 10, height: 10, bgcolor: `${l.color}2a`, borderRadius: 0.5, border: `1px solid ${l.color}70` }} />
-            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>{l.label}</Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '12px' }}>{l.label}</Typography>
           </Stack>
         ))}
         <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.65rem', ml: 'auto !important' }}>
@@ -394,13 +394,13 @@ export default function ReportingPage() {
   return (
     <Box>
       {/* Page header */}
-      <Stack sx={{ mb: 3 }}>
+      <Stack sx={{ mb: 6 }}>
         <Typography variant="h1" component="h1">Reporting</Typography>
         <Typography variant="body2" color="text.secondary">AI-generated risk summaries and portfolio reports</Typography>
       </Stack>
 
       {/* Generator */}
-      <Paper variant="outlined" sx={{ p: 2.5, mb: 3 }}>
+      <Paper variant="outlined" sx={{ p: 2.5, mb: 6 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
           <Typography variant="h2" component="h2">Generate report</Typography>
           <Chip size="small" label="Latest: Q1 2026 · Mar 19"
@@ -438,7 +438,7 @@ export default function ReportingPage() {
 
       {/* Generated Report */}
       {reportGenerated && (
-        <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
+        <Paper variant="outlined" sx={{ p: 3, mb: 6 }}>
           {/* Report header */}
           <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
             <Box>
@@ -488,18 +488,18 @@ export default function ReportingPage() {
           <ReportSection title="Portfolio snapshot">
             <Grid container spacing={2} sx={{ mb: 0 }}>
               {[
-                { label: 'Total active risks', value: '50', sub: '+3 vs Q4 2025',   color: '#e2e8f0' },
-                { label: 'Critical',            value: '4',  sub: '+2 vs Q4 2025',  color: '#C42B31' },
-                { label: 'High',                value: '14', sub: '+2 vs Q4 2025',  color: '#E54E54' },
-                { label: 'Avg residual score',  value: '3.1', sub: '↑ 0.4 vs Q4',  color: '#C29A1D' },
-                { label: 'Controls active',     value: '38', sub: '92% test-passed', color: '#2EB365' },
-                { label: 'Open KRI breaches',   value: '4',  sub: '+3 RED this qtr', color: '#C42B31' },
+                { label: 'Total active risks', value: '50', sub: '+3 vs Q4 2025',    numColor: undefined,  subColor: 'text.secondary' },
+                { label: 'Critical',            value: '4',  sub: '+2 vs Q4 2025',   numColor: '#C42B31',  subColor: '#C42B31' },
+                { label: 'High',                value: '14', sub: '+2 vs Q4 2025',   numColor: '#E54E54',  subColor: '#E54E54' },
+                { label: 'Avg residual score',  value: '3.1', sub: '↑ 0.4 vs Q4',   numColor: '#C29A1D',  subColor: '#C29A1D' },
+                { label: 'Controls active',     value: '38', sub: '92% test-passed', numColor: undefined,  subColor: 'text.secondary' },
+                { label: 'Open KRI breaches',   value: '4',  sub: '+3 breaches this qtr', numColor: '#C42B31', subColor: '#C42B31' },
               ].map(card => (
                 <Grid key={card.label} size={{ xs: 6, sm: 4, md: 2 }}>
                   <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center' }}>
-                    <Typography sx={{ fontSize: '1.6rem', fontWeight: 700, color: card.color, lineHeight: 1.1 }}>{card.value}</Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25, fontSize: '0.7rem' }}>{card.label}</Typography>
-                    <Typography variant="caption" sx={{ fontSize: '0.65rem', color: card.color, opacity: 0.8 }}>{card.sub}</Typography>
+                    <Typography sx={{ fontSize: '32px', fontWeight: 700, color: card.numColor, lineHeight: 1 }}>{card.value}</Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25, fontSize: '12px' }}>{card.label}</Typography>
+                    <Typography variant="caption" sx={{ fontSize: '12px', color: card.subColor, opacity: 0.8 }}>{card.sub}</Typography>
                   </Paper>
                 </Grid>
               ))}
@@ -522,8 +522,8 @@ export default function ReportingPage() {
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={CATEGORY_DATA} layout="vertical" margin={{ top: 0, right: 40, left: 10, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(96,165,250,0.08)" horizontal={false} />
-                    <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-                    <YAxis type="category" dataKey="category" tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={80} />
+                    <XAxis type="number" tick={{ fontSize: 12, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
+                    <YAxis type="category" dataKey="category" tick={{ fontSize: 12, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={80} />
                     <ReTooltip
                       contentStyle={{ background: 'rgba(10,14,26,0.97)', border: '1px solid rgba(96,165,250,0.2)', borderRadius: 8, fontSize: 12, color: '#e2e8f0', boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}
                       itemStyle={{ color: '#94a3b8' }}
@@ -543,8 +543,8 @@ export default function ReportingPage() {
                 <ResponsiveContainer width="100%" height={160}>
                   <BarChart data={CATEGORY_DATA} layout="vertical" margin={{ top: 0, right: 40, left: 10, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(96,165,250,0.08)" horizontal={false} />
-                    <XAxis type="number" domain={[0, 5]} tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-                    <YAxis type="category" dataKey="category" tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={80} />
+                    <XAxis type="number" domain={[0, 5]} tick={{ fontSize: 12, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
+                    <YAxis type="category" dataKey="category" tick={{ fontSize: 12, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={80} />
                     <ReTooltip
                       contentStyle={{ background: 'rgba(10,14,26,0.97)', border: '1px solid rgba(96,165,250,0.2)', borderRadius: 8, fontSize: 12, color: '#e2e8f0', boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}
                       itemStyle={{ color: '#94a3b8' }}
@@ -642,14 +642,14 @@ export default function ReportingPage() {
                 <ResponsiveContainer width="100%" height={200}>
                   <LineChart data={TREND_DATA} margin={{ top: 4, right: 20, left: -10, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(96,165,250,0.08)" />
-                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-                    <YAxis domain={[2, 5]} tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
+                    <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
+                    <YAxis domain={[2, 5]} tick={{ fontSize: 12, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
                     <ReTooltip
                       contentStyle={{ background: 'rgba(10,14,26,0.97)', border: '1px solid rgba(96,165,250,0.2)', borderRadius: 8, fontSize: 12, color: '#e2e8f0', boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}
                       itemStyle={{ color: '#94a3b8' }}
                       formatter={(v: unknown, name: unknown) => [`${(v as number).toFixed(2)}`, name as string]}
                     />
-                    <Legend wrapperStyle={{ fontSize: 11, color: '#94a3b8' }} />
+                    <Legend wrapperStyle={{ fontSize: 12, color: '#94a3b8' }} />
                     <ReferenceLine y={3.0} stroke="rgba(194,154,29,0.5)" strokeDasharray="4 4" label={{ value: 'Appetite', position: 'right', fontSize: 10, fill: '#C29A1D' }} />
                     <Line type="monotone" dataKey="avgInherent" name="Avg inherent" stroke="#C42B31" strokeWidth={2} dot={{ r: 3 }} />
                     <Line type="monotone" dataKey="avgResidual" name="Avg residual" stroke="#0060C7" strokeWidth={2} dot={{ r: 3 }} />
@@ -663,10 +663,10 @@ export default function ReportingPage() {
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={TREND_DATA} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(96,165,250,0.08)" vertical={false} />
-                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
+                    <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
+                    <YAxis tick={{ fontSize: 12, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
                     <ReTooltip contentStyle={{ background: 'rgba(10,14,26,0.97)', border: '1px solid rgba(96,165,250,0.2)', borderRadius: 8, fontSize: 12, color: '#e2e8f0', boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }} itemStyle={{ color: '#94a3b8' }} />
-                    <Legend wrapperStyle={{ fontSize: 10, color: '#94a3b8' }} />
+                    <Legend wrapperStyle={{ fontSize: 12, color: '#94a3b8' }} />
                     <Bar dataKey="critical" name="Critical" stackId="a" fill="#C42B31" fillOpacity={0.85} radius={[0, 0, 0, 0]} />
                     <Bar dataKey="high" name="High" stackId="a" fill="#C29A1D" fillOpacity={0.85} radius={[4, 4, 0, 0]} />
                   </BarChart>

@@ -370,7 +370,7 @@ function QuickStats({ approvedRisks, draftRisks, kris }: { approvedRisks: RiskSu
                 <stat.Icon sx={{ fontSize: 13, color: 'text.disabled', opacity: 0.8 }} />
                 <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>{stat.label}</Typography>
               </Stack>
-              <Typography variant="h5" sx={{ fontWeight: 700, color, lineHeight: 1.1 }}>{stat.value}</Typography>
+              <Typography sx={{ fontSize: '32px', fontWeight: 700, color, lineHeight: 1 }}>{stat.value}</Typography>
               <Typography variant="caption" color="text.disabled">{stat.subtitle}</Typography>
             </Paper>
           </Grid>
@@ -747,20 +747,29 @@ export default function DashboardPage() {
   return (
     <Box sx={{ p: 3 }}>
       {/* ── Header ── */}
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2.5 }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 6 }}>
         <Typography variant="h1" component="h1">Dashboard</Typography>
         <Stack direction="row" spacing={1}>
-          <Button component={Link} href="/reporting" variant="text" size="small" startIcon={<ReportIcon sx={{ fontSize: '14px !important' }} />}>
+          <Button component={Link} href="/reporting" variant="text" size="small">
             Reports
           </Button>
-          <Button component={Link} href="/reporting" variant="contained" size="small" startIcon={<ReportIcon sx={{ fontSize: '14px !important' }} />}>
+          <Button component={Link} href="/reporting" variant="contained" size="small">
             New report
           </Button>
         </Stack>
       </Stack>
 
       {/* ── AI chat ── */}
-      <Box sx={{ mb: 2.5 }}>
+      <Box
+        sx={{
+          mb: 6,
+          p: 2,
+          borderRadius: 2,
+          background: 'linear-gradient(180deg, rgba(96,165,250,0.07) 0%, transparent 100%)',
+          border: '1px solid rgba(96,165,250,0.18)',
+        }}
+      >
+        <Typography variant="h3" component="h2" sx={{ mb: 1.5 }}>Ask the agent</Typography>
         <AIChat risks={approvedRisks} kris={kris} />
       </Box>
 
@@ -768,7 +777,7 @@ export default function DashboardPage() {
       <Paper
         variant="outlined"
         sx={{
-          mb: 2.5,
+          mb: 6,
           px: 2.5, py: 1.5,
           borderLeft: `3px solid ${summaryUrgent ? '#f87171' : '#4ade80'}`,
           bgcolor: summaryUrgent ? 'rgba(248,113,113,0.04)' : 'rgba(74,222,128,0.03)',
@@ -798,13 +807,13 @@ export default function DashboardPage() {
       </Paper>
 
       {/* ── Stats ── */}
-      <Box sx={{ mb: 2.5 }}>
+      <Box sx={{ mb: 6 }}>
         <QuickStats approvedRisks={approvedRisks} draftRisks={draftRisks} kris={kris} />
       </Box>
 
       {/* ── Priority risks + landscape charts ── */}
       {approvedRisks.length > 0 && (
-        <Grid container spacing={2} sx={{ mb: 2.5 }}>
+        <Grid container spacing={3} sx={{ mb: 6 }}>
           <Grid size={{ xs: 12, md: 7 }}>
             <TopPriorityRisks risks={approvedRisks} />
           </Grid>
@@ -816,14 +825,14 @@ export default function DashboardPage() {
 
       {/* ── KRI strip ── */}
       {kris.length > 0 && (
-        <Box sx={{ mb: 2.5 }}>
+        <Box sx={{ mb: 6 }}>
           <KRIStatusStrip kris={kris} />
         </Box>
       )}
 
       {/* ── Agent queue ── */}
-      <Box sx={{ mb: 2.5 }}>
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.25 }}>
+      <Box sx={{ mb: 6 }}>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
           <Typography variant="h2" component="h2">Agent queue</Typography>
           <Chip size="small" label={`${PENDING_TASKS.length} pending`}
             variant="outlined"

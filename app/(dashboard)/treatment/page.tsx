@@ -488,12 +488,9 @@ export default function TreatmentPage() {
   return (
     <Box>
       {/* ── Header ── */}
-      <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 3 }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 6 }}>
         <Box>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <MonitorIcon sx={{ color: '#60a5fa', fontSize: 22 }} />
-            <Typography variant="h1" component="h1">Treatment & monitoring</Typography>
-          </Stack>
+          <Typography variant="h1" component="h1">Treatment & monitoring</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
             Track residual risk, treatment strategies, controls, and performance against appetite
           </Typography>
@@ -513,7 +510,7 @@ export default function TreatmentPage() {
       </Stack>
 
       {/* ── Stats row ── */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
+      <Grid container spacing={3} sx={{ mb: 6 }}>
         {[
           { label: 'Tracked risks', value: stats.total,               sub: 'In register',            color: '#60a5fa' },
           { label: 'High priority',  value: stats.highPriority,        sub: 'Inherent score ≥ 4',     color: '#E54E54' },
@@ -526,7 +523,7 @@ export default function TreatmentPage() {
                 <Box sx={{ width: 4, height: 36, borderRadius: 1, bgcolor: s.color, flexShrink: 0, mt: 0.25 }} />
                 <Box>
                   <Typography variant="caption" color="text.secondary">{s.label}</Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 700, lineHeight: 1.2 }}>{s.value}</Typography>
+                  <Typography sx={{ fontSize: '32px', fontWeight: 700, lineHeight: 1 }}>{s.value}</Typography>
                   <Typography variant="caption" color="text.disabled">{s.sub}</Typography>
                 </Box>
               </Stack>
@@ -536,7 +533,7 @@ export default function TreatmentPage() {
       </Grid>
 
       {/* ── Appetite reference banner ── */}
-      <Paper variant="outlined" sx={{ p: 1.75, mb: 3, bgcolor: 'rgba(10,16,30,0.4)' }}>
+      <Paper variant="outlined" sx={{ p: 1.75, mb: 6, bgcolor: 'rgba(10,16,30,0.4)' }}>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }}>
           <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0 }}>
             <InfoIcon sx={{ fontSize: 15, color: 'text.secondary' }} />
@@ -562,7 +559,7 @@ export default function TreatmentPage() {
       {/* ══════════════════════════════════════════════════════════════════════
           ALWAYS-VISIBLE CHARTS — 6-month trend + inherent vs residual by category
       ══════════════════════════════════════════════════════════════════════ */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
+      <Grid container spacing={3} sx={{ mb: 6 }}>
 
         {/* ── 6-month residual risk trend ── */}
         <Grid size={{ xs: 12, md: 7 }}>
@@ -761,7 +758,11 @@ export default function TreatmentPage() {
 
           {/* Strategy detail accordion */}
           {byStrategy.map(g => (
-            <Paper key={g.strategy} variant="outlined" sx={{ mb: 1.5, overflow: 'hidden' }}>
+            <Box key={g.strategy} sx={{ mb: 1.5 }}>
+              <Typography variant="h3" sx={{ mb: 1 }}>
+                {g.strategy.charAt(0).toUpperCase() + g.strategy.slice(1)}
+              </Typography>
+            <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
               {/* Header */}
               <Stack
                 direction="row" spacing={1.5} alignItems="center"
@@ -769,11 +770,6 @@ export default function TreatmentPage() {
                 onClick={() => setExpandedStrategy(expandedStrategy === g.strategy ? null : g.strategy)}
               >
                 <Box sx={{ width: 3, height: 32, borderRadius: 1, bgcolor: treatmentColor(g.strategy), flexShrink: 0 }} />
-                <Chip
-                  label={g.strategy.charAt(0).toUpperCase() + g.strategy.slice(1)}
-                  size="small"
-                  sx={{ height: 22, fontSize: '0.75rem', bgcolor: `${treatmentColor(g.strategy)}18`, color: treatmentColor(g.strategy), border: `1px solid ${treatmentColor(g.strategy)}40`, fontWeight: 700 }}
-                />
                 <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
                   {g.risks.length} risk{g.risks.length !== 1 ? 's' : ''}
                 </Typography>
@@ -945,6 +941,7 @@ export default function TreatmentPage() {
                 </Table>
               </Collapse>
             </Paper>
+            </Box>
           ))}
 
           {/* Agent action panel */}
@@ -1376,7 +1373,7 @@ export default function TreatmentPage() {
             </Button>
           </Stack>
 
-          <Grid container spacing={2} sx={{ mb: 3 }}>
+          <Grid container spacing={3} sx={{ mb: 6 }}>
             {kris.map(kri => (
               <Grid key={kri.id} size={{ xs: 12, sm: 6, lg: 3 }}>
                 <KRICard kri={kri} />

@@ -110,7 +110,7 @@ export default function SettingsPage() {
 
   return (
     <Box>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 6 }}>
         <Box>
           <Typography variant="h1" component="h1">
             Settings
@@ -122,7 +122,7 @@ export default function SettingsPage() {
       </Stack>
 
       {/* Uploaded Documents Section */}
-      <Box sx={{ mb: 4 }}>
+      <Box sx={{ mb: 6 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
           <Stack direction="row" spacing={1.5} alignItems="center">
             <FolderIcon sx={{ fontSize: 24, color: 'text.secondary' }} />

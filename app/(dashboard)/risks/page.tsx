@@ -414,7 +414,7 @@ export default function RiskRegisterPage() {
   const [kris, setKRIs] = useState<KeyRiskIndicator[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilters, setActiveFilters] = useState<Record<string, string | string[]>>({});
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(['risk', 'category', 'score', 'residual', 'owner', 'status']);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(['risk', 'category', 'score', 'residual', 'description', 'treatment', 'owner', 'status', 'kri_signals']);
   const [selectedCell, setSelectedCell] = useState<SelectedCell | null>(null);
 
   useEffect(() => {
@@ -449,13 +449,16 @@ export default function RiskRegisterPage() {
   ];
   
   const columnOptions = [
-    { id: 'risk',        label: 'Risk' },
-    { id: 'category',    label: 'Category' },
-    { id: 'score',       label: 'Inherent score' },
-    { id: 'residual',    label: 'Residual score' },
-    { id: 'owner',       label: 'Owner' },
-    { id: 'status',      label: 'Status' },
-    { id: 'kri_signals', label: 'KRI signals' },
+    { id: 'risk',           label: 'Risk' },
+    { id: 'category',       label: 'Category' },
+    { id: 'score',          label: 'Inherent score' },
+    { id: 'residual',       label: 'Residual score' },
+    { id: 'description',    label: 'Description' },
+    { id: 'treatment',      label: 'Treatment' },
+    { id: 'owner',          label: 'Owner' },
+    { id: 'status',         label: 'Status' },
+    { id: 'kri_signals',    label: 'KRI signals' },
+    { id: 'assessed_date',  label: 'Assessment date' },
   ];
   
   const handleFilterChange = (filterId: string, value: string | string[]) => {
@@ -501,7 +504,7 @@ export default function RiskRegisterPage() {
 
   return (
     <Box>
-      <Box sx={{ mb: 2 }}>
+      <Box sx={{ mb: 6 }}>
         <Typography variant="h1" component="h1">
           Risk register
         </Typography>
@@ -580,18 +583,21 @@ export default function RiskRegisterPage() {
 
           <HeatmapSidesheet cell={selectedCell} onClose={() => setSelectedCell(null)} />
 
-          <TableContainer component={Paper} variant="outlined">
-            <Table size="small">
+          <TableContainer component={Paper} variant="outlined" sx={{ overflowX: 'auto' }}>
+            <Table size="small" sx={{ minWidth: 900 }}>
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ width: 80 }}>ID</TableCell>
-                  {visibleColumns.includes('risk')     && <TableCell>Risk</TableCell>}
-                  {visibleColumns.includes('category') && <TableCell>Category</TableCell>}
-                  {visibleColumns.includes('score')    && <TableCell>Inherent score</TableCell>}
-                  {visibleColumns.includes('residual') && <TableCell>Residual score</TableCell>}
-                  {visibleColumns.includes('owner')       && <TableCell>Owner</TableCell>}
-                  {visibleColumns.includes('status')      && <TableCell>Status</TableCell>}
-                  {visibleColumns.includes('kri_signals') && <TableCell>KRI signals</TableCell>}
+                  <TableCell sx={{ width: 80, whiteSpace: 'nowrap' }}>ID</TableCell>
+                  {visibleColumns.includes('risk')          && <TableCell sx={{ minWidth: 180 }}>Risk</TableCell>}
+                  {visibleColumns.includes('category')      && <TableCell sx={{ minWidth: 110 }}>Category</TableCell>}
+                  {visibleColumns.includes('score')         && <TableCell sx={{ minWidth: 130 }}>Inherent score</TableCell>}
+                  {visibleColumns.includes('residual')      && <TableCell sx={{ minWidth: 130 }}>Residual score</TableCell>}
+                  {visibleColumns.includes('description')   && <TableCell sx={{ minWidth: 200 }}>Description</TableCell>}
+                  {visibleColumns.includes('treatment')     && <TableCell sx={{ minWidth: 110 }}>Treatment</TableCell>}
+                  {visibleColumns.includes('owner')         && <TableCell sx={{ minWidth: 120 }}>Owner</TableCell>}
+                  {visibleColumns.includes('status')        && <TableCell sx={{ minWidth: 110 }}>Status</TableCell>}
+                  {visibleColumns.includes('kri_signals')   && <TableCell sx={{ minWidth: 100 }}>KRI signals</TableCell>}
+                  {visibleColumns.includes('assessed_date') && <TableCell sx={{ minWidth: 130 }}>Assessment date</TableCell>}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -600,7 +606,7 @@ export default function RiskRegisterPage() {
                   const res = deriveResiduals(risk);
                   return (
                     <TableRow key={risk.id} hover>
-                      <TableCell>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>
                         <Typography variant="caption" sx={{ fontFamily: 'monospace', fontWeight: 700, color: 'text.secondary', letterSpacing: '0.02em' }}>
                           {getRiskDisplayId(risk.id, approvedRisks)}
                         </Typography>
@@ -670,6 +676,25 @@ export default function RiskRegisterPage() {
                               </Stack>
                             </Stack>
                           </Stack>
+                        </TableCell>
+                      )}
+                      {visibleColumns.includes('description') && (
+                        <TableCell>
+                          <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.5, display: 'block', maxWidth: 200 }}>
+                            {risk.description ? risk.description.slice(0, 80) + (risk.description.length > 80 ? '…' : '') : '—'}
+                          </Typography>
+                        </TableCell>
+                      )}
+                      {visibleColumns.includes('treatment') && (
+                        <TableCell>
+                          {(() => {
+                            const r = deriveResiduals(risk);
+                            const strategy = r.reductionPct >= 30 ? 'Mitigate' : r.reductionPct >= 10 ? 'Transfer' : r.reductionPct > 0 ? 'Accept' : 'Avoid';
+                            return (
+                              <Chip size="small" label={strategy} variant="outlined"
+                                sx={{ height: 20, fontSize: '0.72rem', color: 'text.secondary' }} />
+                            );
+                          })()}
                         </TableCell>
                       )}
                       {visibleColumns.includes('owner') && (
@@ -748,6 +773,15 @@ export default function RiskRegisterPage() {
                             }
                             return null;
                           })()}
+                        </TableCell>
+                      )}
+                      {visibleColumns.includes('assessed_date') && (
+                        <TableCell>
+                          <Typography variant="caption" color="text.secondary">
+                            {risk.assessmentStatus === 'assessed'
+                              ? new Date(risk.createdAt ?? Date.now()).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+                              : '—'}
+                          </Typography>
                         </TableCell>
                       )}
                     </TableRow>

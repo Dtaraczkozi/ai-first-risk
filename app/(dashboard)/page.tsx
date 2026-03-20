@@ -428,11 +428,11 @@ function RiskSummaryStats({ suggestions, approvedCount }: { suggestions: RiskSug
   const highSeverityCount = suggestions.filter(r => r.likelihood * r.impact >= 15).length;
 
   return (
-    <Box sx={{ mb: 3 }}>
-      <Grid container spacing={2}>
+    <Box sx={{ mb: 6 }}>
+      <Grid container spacing={3}>
         <Grid size={{ xs: 6, sm: 3 }}>
           <Paper sx={{ p: 3, height: 96, display: 'flex', flexDirection: 'column', justifyContent: 'center' }} variant="outlined">
-            <Typography variant="h2" sx={{ lineHeight: 1 }}>
+            <Typography sx={{ fontSize: '32px', fontWeight: 700, lineHeight: 1 }}>
               {totalIdentified}
             </Typography>
             <Typography variant="caption" color="text.secondary">
@@ -442,7 +442,7 @@ function RiskSummaryStats({ suggestions, approvedCount }: { suggestions: RiskSug
         </Grid>
         <Grid size={{ xs: 6, sm: 3 }}>
           <Paper sx={{ p: 3, height: 96, display: 'flex', flexDirection: 'column', justifyContent: 'center' }} variant="outlined">
-            <Typography variant="h2" sx={{ lineHeight: 1 }}>
+            <Typography sx={{ fontSize: '32px', fontWeight: 700, lineHeight: 1 }}>
               {pendingCount}
             </Typography>
             <Typography variant="caption" color="text.secondary">
@@ -452,7 +452,7 @@ function RiskSummaryStats({ suggestions, approvedCount }: { suggestions: RiskSug
         </Grid>
         <Grid size={{ xs: 6, sm: 3 }}>
           <Paper sx={{ p: 3, height: 96, display: 'flex', flexDirection: 'column', justifyContent: 'center' }} variant="outlined">
-            <Typography variant="h2" sx={{ lineHeight: 1 }}>
+            <Typography sx={{ fontSize: '32px', fontWeight: 700, lineHeight: 1 }}>
               {approvedCount}
             </Typography>
             <Typography variant="caption" color="text.secondary">
@@ -462,7 +462,7 @@ function RiskSummaryStats({ suggestions, approvedCount }: { suggestions: RiskSug
         </Grid>
         <Grid size={{ xs: 6, sm: 3 }}>
           <Paper sx={{ p: 3, height: 96, display: 'flex', flexDirection: 'column', justifyContent: 'center' }} variant="outlined">
-            <Typography variant="h2" sx={{ lineHeight: 1, color: highSeverityCount > 0 ? '#f87171' : undefined }}>
+            <Typography sx={{ fontSize: '32px', fontWeight: 700, lineHeight: 1, color: highSeverityCount > 0 ? '#f87171' : undefined }}>
               {highSeverityCount}
             </Typography>
             <Typography variant="caption" color="text.secondary">
@@ -929,7 +929,7 @@ function RiskDiscoveryContent() {
       />
 
       {/* Header - always visible */}
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 6 }}>
         <Typography variant="h1" component="h1">
           Risk discovery
         </Typography>
@@ -1052,7 +1052,7 @@ function RiskDiscoveryContent() {
 
       {/* Processing overlay when there are existing risks */}
       <Collapse in={isProcessing && hasExistingRisks} timeout={400}>
-        <Paper sx={{ p: 2, mb: 3, transition: 'all 0.3s ease' }} variant="outlined">
+        <Paper sx={{ p: 2, mb: 6, transition: 'all 0.3s ease' }} variant="outlined">
           <Fade in={appState === 'uploading'} timeout={300} unmountOnExit>
             <Box>
               <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
@@ -1182,43 +1182,9 @@ function RiskDiscoveryContent() {
                   External intelligence
                 </Typography>
 
-                {/* Collapsed summary — shown inline when closed */}
-                {!externalIntelExpanded && (
-                  <>
-                    <Divider orientation="vertical" flexItem />
-                    <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                      {totalExternal} suggestion{totalExternal !== 1 ? 's' : ''} from outside sources
-                    </Typography>
-                    <Stack direction="row" spacing={0.75} onClick={(e) => e.stopPropagation()}>
-                      {sourcePills.map(p => (
-                        <Tooltip key={p.key} title={`Filter table by ${p.label.toLowerCase()} sources`} placement="top">
-                          <Chip
-                            size="small"
-                            icon={p.icon}
-                            label={`${p.label} · ${p.count}`}
-                            onClick={() => filterAndScroll(p.key)}
-                            sx={{
-                              height: 22,
-                              fontSize: '0.72rem',
-                              cursor: 'pointer',
-                              bgcolor: p.bg,
-                              color: p.color,
-                              border: `1px solid ${p.border}`,
-                              '& .MuiChip-icon': { color: p.color },
-                              '&:hover': { opacity: 0.85, borderColor: p.color },
-                            }}
-                          />
-                        </Tooltip>
-                      ))}
-                    </Stack>
-                  </>
-                )}
-
-                {externalIntelExpanded && (
-                  <Typography variant="caption" color="text.secondary">
-                    Sources that drove agent risk identification
-                  </Typography>
-                )}
+                <Typography variant="caption" color="text.secondary">
+                  Sources that drove agent risk identification
+                </Typography>
 
                 {/* Rightmost: rotating chevron */}
                 <ExpandMoreIcon

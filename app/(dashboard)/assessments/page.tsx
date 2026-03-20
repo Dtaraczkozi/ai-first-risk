@@ -67,7 +67,9 @@ import {
   CompareArrows as DeltaIcon,
   Info as InfoIcon,
   Verified as VerifiedIcon,
+  AttachFile as FileAttachIcon,
 } from '@mui/icons-material';
+import Link from 'next/link';
 import type { RiskSuggestion } from '@/types/document';
 import { getApprovedRisks, updateApprovedRisk } from '@/lib/risk-store';
 import { RISK_CATEGORY_COLORS, getRiskDisplayId } from '@/lib/utils';
@@ -196,6 +198,7 @@ export default function AssessmentsPage() {
   });
 
   const [snackMessage, setSnackMessage] = useState<string | null>(null);
+  const [assessingGroupIds, setAssessingGroupIds] = useState<Set<string>>(new Set());
   // Results panel state for Tab 1
   const [expandedResultGroupId, setExpandedResultGroupId] = useState<string | null>(null);
   const [expandedRiskResultId, setExpandedRiskResultId] = useState<string | null>(null);
@@ -226,6 +229,18 @@ export default function AssessmentsPage() {
     // Auto-expand the newly started category
     if (affectedCategory) setExpandedResultGroupId(affectedCategory);
     setSnackMessage(`Assessment started for ${toStart.length} risk${toStart.length !== 1 ? 's' : ''} — ${affectedCategory ? affectedCategory + ' category' : 'selected risks'}`);
+
+    // Simulate AI persona auto-assessment with pulsing indicator
+    const groupKey = affectedCategory ?? 'all';
+    setAssessingGroupIds(prev => new Set([...prev, groupKey]));
+    setTimeout(() => {
+      setAssessingGroupIds(prev => {
+        const next = new Set(prev);
+        next.delete(groupKey);
+        return next;
+      });
+      setSnackMessage('AI assessors have submitted their opinions');
+    }, 1800);
   }
 
   // Priority queue: unassessed risks sorted by score, top 10
@@ -743,7 +758,7 @@ export default function AssessmentsPage() {
       {/* ── Main content column ── */}
       <Box sx={{ flex: 1, minWidth: 0, pl: detailGroup ? 2 : 0, pr: detailGroup ? 2 : 0, transition: 'padding 0.2s ease' }}>
 
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2.5 }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 6 }}>
           <Typography variant="h1" component="h1">
             Assessments
           </Typography>
@@ -758,9 +773,9 @@ export default function AssessmentsPage() {
           const urgencyBorder = { critical: 'rgba(248,113,113,0.28)', high: 'rgba(251,191,36,0.25)', medium: 'rgba(148,163,184,0.18)' };
 
           return (
-            <Box sx={{ mb: 3 }}>
+            <Box sx={{ mb: 6 }}>
               {/* Stats strip */}
-              <Grid container spacing={1.5} sx={{ mb: 2 }}>
+              <Grid container spacing={3} sx={{ mb: 3 }}>
                 {[
                   {
                     label: 'Total risks',
@@ -808,7 +823,7 @@ export default function AssessmentsPage() {
                 ].map(stat => (
                   <Grid key={stat.label} size={{ xs: 6, sm: 4, md: 2 }}>
                     <Paper variant="outlined" sx={{ p: 1.5, bgcolor: stat.accent, height: '100%' }}>
-                      <Typography variant="h5" sx={{ fontWeight: 700, color: stat.color, lineHeight: 1.15 }}>
+                      <Typography sx={{ fontSize: '32px', fontWeight: 700, color: stat.color, lineHeight: 1 }}>
                         {stat.value}
                         {stat.progress !== undefined && (
                           <Typography component="span" variant="caption" sx={{ ml: 0.75, fontWeight: 400, color: stat.color, opacity: 0.8 }}>
@@ -1912,14 +1927,25 @@ export default function AssessmentsPage() {
                     const assessedRisks = g.risks.filter(r => r.assessmentStatus === 'assessed');
                     const pendingRisks = g.risks.filter(r => r.assessmentStatus !== 'assessed');
 
+                    const isAssessingNow = assessingGroupIds.has(g.category) || assessingGroupIds.has(g.id) || assessingGroupIds.has('all');
+
                     return (
-                      <Paper key={g.id} variant="outlined" sx={{ overflow: 'hidden' }}>
+                      <Box key={g.id}>
+                        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1.5 }}>
+                          <Typography variant="h3">{g.label}</Typography>
+                          {isAssessingNow && (
+                            <Chip size="small"
+                              icon={<AIBadgeIcon sx={{ fontSize: '11px !important', color: '#60a5fa !important', animation: 'pulse 1.4s ease-in-out infinite', '@keyframes pulse': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.45 } } }} />}
+                              label="AI assessors are assessing…"
+                              sx={{ height: 20, fontSize: '0.65rem', bgcolor: 'rgba(96,165,250,0.08)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.2)' }} />
+                          )}
+                        </Stack>
+                      <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
                         <Box sx={{ p: 2.5 }}>
                           {/* Header row */}
                           <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1.5 }}>
                             <Box sx={{ flex: 1, mr: 2 }}>
                               <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" gap={0.5}>
-                                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{g.label}</Typography>
                                 <Chip size="small" label={statusChip.label}
                                   sx={{ height: 20, fontSize: '0.7rem', bgcolor: statusChip.bg, color: statusChip.color, border: `1px solid ${statusChip.border}` }} />
                                 {g.highSevCount > 0 && !g.isCompleted && (
@@ -1982,10 +2008,15 @@ export default function AssessmentsPage() {
                               )}
                             </Stack>
                             <Stack direction="row" spacing={1}>
-                              <Button size="small" variant="outlined"
+                              <Button size="small" variant="text"
                                 startIcon={<ExpandMoreIcon sx={{ fontSize: '14px !important', transform: resultsExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />}
                                 onClick={() => setExpandedResultGroupId(resultsExpanded ? null : g.id)}>
-                                {resultsExpanded ? 'Hide results' : `View results (${assessedRisks.length + pendingRisks.length})`}
+                                {resultsExpanded ? 'Hide results' : 'Quick view'}
+                              </Button>
+                              <Button size="small" variant="outlined"
+                                component={Link}
+                                href={`/assessments/results/${encodeURIComponent(g.id)}`}>
+                                View full results →
                               </Button>
                               {!g.isCompleted && (
                                 <Button size="small" variant="contained" startIcon={<ArrowIcon />}
@@ -2112,7 +2143,8 @@ export default function AssessmentsPage() {
                                                 ? '1px solid rgba(251,191,36,0.25)'
                                                 : `1px solid ${isAI ? 'rgba(96,165,250,0.12)' : 'rgba(255,255,255,0.07)'}`,
                                             }}>
-                                              <Stack direction="row" alignItems="flex-start" spacing={1.5}>
+                                              {/* Top row: avatar + name + scores + overall score */}
+                                              <Stack direction="row" alignItems="flex-start" spacing={1.5} sx={{ mb: 1.25 }}>
                                                 {/* Avatar + name */}
                                                 <Stack direction="row" spacing={0.75} alignItems="center" sx={{ minWidth: 160, flexShrink: 0 }}>
                                                   <Avatar sx={{ width: 24, height: 24, fontSize: '0.6rem', bgcolor: isAI ? '#1e3a5f' : ownerColors[op.assessorName] || '#374151' }}>
@@ -2160,15 +2192,36 @@ export default function AssessmentsPage() {
                                                 <Stack spacing={0.25} sx={{ minWidth: 64, flexShrink: 0 }}>
                                                   <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.65rem' }}>Score</Typography>
                                                   <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1, color: SCORE_COLOR[score] }}>{score}</Typography>
-                                                  <Chip size="small" label={op.confidence}
-                                                    sx={{ height: 15, fontSize: '0.58rem', bgcolor: `${CONF_COLOR[op.confidence]}18`, color: CONF_COLOR[op.confidence], border: `1px solid ${CONF_COLOR[op.confidence]}40`, '& .MuiChip-label': { px: 0.75 } }} />
+                                                  <Chip size="small" label={op.confidence} variant="outlined"
+                                                    sx={{ height: 15, fontSize: '0.58rem', '& .MuiChip-label': { px: 0.75 } }} />
                                                 </Stack>
+                                              </Stack>
 
-                                                {/* Rationale */}
-                                                <Typography variant="caption" color="text.secondary" sx={{ flex: 1, lineHeight: 1.6, fontSize: '0.78rem', minWidth: 0 }}>
+                                              {/* Written assessment block */}
+                                              <Box sx={{ mb: 1, p: 1.25, borderRadius: 1, bgcolor: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                                                <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.disabled', fontSize: '0.65rem', display: 'block', mb: 0.5 }}>
+                                                  Written assessment
+                                                </Typography>
+                                                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.6, fontSize: '0.78rem' }}>
                                                   {op.rationale}
                                                 </Typography>
-                                              </Stack>
+                                              </Box>
+
+                                              {/* Attachments */}
+                                              {isAI && (
+                                                <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" gap={0.5}>
+                                                  <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.disabled', fontSize: '0.65rem' }}>
+                                                    Attachments:
+                                                  </Typography>
+                                                  {[`${op.assessorName.replace(' Persona', '').replace(' ', '_')}_Analysis.pdf`,
+                                                    `${op.assessorName.replace(' Persona', '').replace(' ', '_')}_Notes.pdf`].slice(0, opIdx % 2 === 0 ? 2 : 1).map(f => (
+                                                    <Chip key={f} size="small" label={f}
+                                                      icon={<FileAttachIcon sx={{ fontSize: '11px !important' }} />}
+                                                      variant="outlined"
+                                                      sx={{ height: 20, fontSize: '0.65rem', '& .MuiChip-icon': { ml: 0.5 }, cursor: 'pointer', '&:hover': { bgcolor: 'rgba(96,165,250,0.06)' } }} />
+                                                  ))}
+                                                </Stack>
+                                              )}
                                             </Box>
                                           );
                                         })}
@@ -2220,6 +2273,7 @@ export default function AssessmentsPage() {
                           </Box>
                         </Collapse>
                       </Paper>
+                      </Box>
                     );
                   })}
                 </Stack>
