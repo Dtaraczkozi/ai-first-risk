@@ -18,7 +18,7 @@ import {
   Box,
   IconButton,
 } from '@mui/material';
-import { Close as CloseIcon } from '@mui/icons-material';
+import { Close as CloseIcon, Save as SaveIcon, Add as AddIcon } from '@mui/icons-material';
 import type { Risk, RiskCategory, RiskStatus } from '@/types/risk';
 
 interface RiskFormProps {
@@ -143,7 +143,7 @@ export function RiskForm({ open, risk, onClose, onSave }: RiskFormProps) {
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 fullWidth
-                label="Risk Owner"
+                label="Risk owner"
                 value={formData.owner}
                 onChange={(e) => setFormData({ ...formData, owner: e.target.value })}
               />
@@ -215,7 +215,7 @@ export function RiskForm({ open, risk, onClose, onSave }: RiskFormProps) {
           <Button variant="outlined" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="contained" type="submit">
+          <Button variant="contained" startIcon={isEdit ? <SaveIcon /> : <AddIcon />} type="submit">
             {isEdit ? 'Save changes' : 'Add risk'}
           </Button>
         </DialogActions>

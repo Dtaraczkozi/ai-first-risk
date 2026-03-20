@@ -287,7 +287,7 @@ export default function SettingsPage() {
                 <Button size="small" onClick={() => setIsAddingSource(false)}>
                   Cancel
                 </Button>
-                <Button size="small" variant="contained" onClick={addSource} disabled={!newSource.name.trim()}>
+                <Button size="small" variant="contained" startIcon={<AddIcon />} onClick={addSource} disabled={!newSource.name.trim()}>
                   Add
                 </Button>
               </Stack>

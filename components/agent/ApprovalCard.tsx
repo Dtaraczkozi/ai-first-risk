@@ -20,6 +20,7 @@ import {
   Security as SecurityIcon,
   Assessment as AssessmentIcon,
   MoreVert as MoreIcon,
+  Check as CheckIcon,
 } from '@mui/icons-material';
 import type { ApprovalRequest, AgentTaskType } from '@/types/agent';
 
@@ -164,6 +165,7 @@ export function ApprovalCard({ request, onApprove, onReject, onViewDetails }: Ap
           <Button
             variant="contained"
             size="small"
+            startIcon={<CheckIcon />}
             onClick={() => onApprove(request.id)}
           >
             Approve

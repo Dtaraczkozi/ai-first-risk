@@ -19,6 +19,7 @@ import {
 import {
   Close as CloseIcon,
   AutoAwesome as AiIcon,
+  Check as CheckIcon,
 } from '@mui/icons-material';
 import type { ApprovalRequest } from '@/types/agent';
 
@@ -156,6 +157,7 @@ export function ApprovalDialog({ open, request, action, onClose, onConfirm }: Ap
         <Button
           variant="contained"
           color={isApprove ? 'primary' : 'error'}
+          startIcon={isApprove ? <CheckIcon /> : <CloseIcon />}
           onClick={handleConfirm}
           autoFocus
         >

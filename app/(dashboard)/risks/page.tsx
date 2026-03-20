@@ -26,7 +26,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } 
 import Link from 'next/link';
 import { getSeverityColor, getScoreColor, getScoreLabel as getScoreLabelUtil, RISK_CATEGORY_COLORS, getRiskDisplayId } from '@/lib/utils';
 import { getApprovedRisks, seedMockRisks } from '@/lib/risk-store';
-import { getKRIs } from '@/lib/kri-store';
+import { getKRIs, ensureKRIRiskLinks } from '@/lib/kri-store';
 import { TableToolbar } from '@/components/TableToolbar';
 import { HeatmapSidesheet, type SelectedCell } from '@/components/risks/HeatmapSidesheet';
 import type { RiskSuggestion } from '@/types/document';
@@ -416,7 +416,9 @@ export default function RiskRegisterPage() {
 
   useEffect(() => {
     seedMockRisks(50);
-    setApprovedRisks(getApprovedRisks());
+    const loadedRisks = getApprovedRisks();
+    setApprovedRisks(loadedRisks);
+    ensureKRIRiskLinks(loadedRisks);
     setKRIs(getKRIs());
   }, []);
 
@@ -576,7 +578,7 @@ export default function RiskRegisterPage() {
           <TableContainer component={Paper} variant="outlined">
             <Table size="small">
               <TableHead>
-                <TableRow sx={{ '& .MuiTableCell-head': { fontWeight: 600, fontSize: '0.75rem', color: 'text.secondary' } }}>
+                <TableRow>
                   <TableCell sx={{ width: 80 }}>ID</TableCell>
                   {visibleColumns.includes('risk')     && <TableCell>Risk</TableCell>}
                   {visibleColumns.includes('category') && <TableCell>Category</TableCell>}

@@ -32,6 +32,7 @@ import {
   SourceOutlined as SourcesIcon,
   PeopleOutlined as UsersIcon,
   ExtensionOutlined as IntegrationsIcon,
+  ShowChart as KRIIcon,
 } from '@mui/icons-material';
 
 const DRAWER_WIDTH = 264;
@@ -72,6 +73,7 @@ export function Sidebar({ pendingApprovals = 0 }: SidebarProps) {
     { href: '/',            label: 'Risk Discovery',        icon: <SearchIcon /> },
     { href: '/assessments', label: 'Assessments',           icon: <AssessmentIcon /> },
     { href: '/treatment',   label: 'Treatment & Monitoring',icon: <TreatmentIcon /> },
+    { href: '/kris',        label: 'KRIs',                  icon: <KRIIcon /> },
     { href: '/risks',       label: 'Risk Register',         icon: <ShieldIcon />, badge: pendingApprovals },
     { href: '/reporting',   label: 'Reporting',             icon: <HistoryIcon /> },
   ];

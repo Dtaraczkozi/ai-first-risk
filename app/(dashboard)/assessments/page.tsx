@@ -39,7 +39,6 @@ import {
 } from '@mui/material';
 import {
   ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
   CheckCircle as CompletedIcon,
   AccessTime as ClockIcon,
   ArrowForward as ArrowIcon,
@@ -56,15 +55,29 @@ import {
   Close as CloseIcon,
   Refresh as RefreshIcon,
   Add as AddIcon,
+  PlayArrow as PlayArrowIcon,
+  Save as SaveIcon,
+  Check as CheckIcon,
+  Person as PersonIcon,
+  Category as CategoryIcon,
+  Sort as SortIcon,
+  AutoAwesome as AIBadgeIcon,
+  Send as SendIcon,
+  FlagOutlined as OutlierIcon,
+  CompareArrows as DeltaIcon,
+  Info as InfoIcon,
+  Verified as VerifiedIcon,
 } from '@mui/icons-material';
 import type { RiskSuggestion } from '@/types/document';
-import { getApprovedRisks } from '@/lib/risk-store';
+import { getApprovedRisks, updateApprovedRisk } from '@/lib/risk-store';
 import { RISK_CATEGORY_COLORS, getRiskDisplayId } from '@/lib/utils';
 import { AssessmentDetailPanel, type AssessmentGroup } from '@/components/assessment/AssessmentDetailDrawer';
 import { getPersonas, updatePersona, addPersona } from '@/lib/persona-store';
+import { getKRIs } from '@/lib/kri-store';
 import { MOCK_SYNTHESISED_ASSESSMENTS } from '@/data/mock/synthesis';
 import { MOCK_PERSONAS } from '@/data/mock/personas';
 import type { AIAssessorPersona, AssessorOpinion } from '@/types/assessor-persona';
+import type { KeyRiskIndicator } from '@/types/kri';
 
 const categoryColors = RISK_CATEGORY_COLORS;
 
@@ -99,17 +112,35 @@ const sourceLabels: Record<string, string> = {
   manual: 'Manual',
 };
 
-const KRI_INDICATORS: Record<string, Array<{ count: number; status: 'red' | 'amber' }>> = {
-  cyber: [{ count: 2, status: 'red' }],
-  compliance: [{ count: 2, status: 'red' }, { count: 1, status: 'amber' }],
-  financial: [{ count: 1, status: 'red' }],
+// KRI helpers — derived dynamically from the store (see component state)
+function getKRIChipsForCategory(kris: KeyRiskIndicator[], category: string): Array<{ count: number; status: 'red' | 'amber' }> {
+  const catKRIs = kris.filter((k) => k.category === category && k.status !== 'green');
+  const red = catKRIs.filter((k) => k.status === 'red').length;
+  const amber = catKRIs.filter((k) => k.status === 'amber').length;
+  const result: Array<{ count: number; status: 'red' | 'amber' }> = [];
+  if (red > 0) result.push({ count: red, status: 'red' });
+  if (amber > 0) result.push({ count: amber, status: 'amber' });
+  return result;
+}
+
+function getKRILinkageText(kris: KeyRiskIndicator[], category: string): string | null {
+  const catKRIs = kris.filter((k) => k.category === category);
+  const redKRIs = catKRIs.filter((k) => k.status === 'red');
+  if (redKRIs.length === 0) return null;
+  const names = redKRIs.slice(0, 2).map((k) => k.name).join(', ');
+  return `↳ KRI signal${redKRIs.length > 1 ? 's' : ''}: ${names}${redKRIs.length > 2 ? ` +${redKRIs.length - 2} more` : ''} — currently RED`;
+}
+
+// Map category → MOCK_SYNTHESISED_ASSESSMENTS index
+const RESULTS_BY_CATEGORY: Record<string, number> = {
+  cyber: 0,
+  financial: 1,
+  compliance: 2,
 };
 
-const KRI_LINKAGES = [
-  '↳ KRI: Unpatched CVEs — currently RED',
-  '↳ KRI: Regulatory findings unresolved >30d — currently RED',
-  '↳ KRI: FX Hedge Ratio — currently RED',
-];
+const SCORE_LABEL: Record<number, string> = { 1: 'Very low', 2: 'Low', 3: 'Medium', 4: 'High', 5: 'Very high' };
+const SCORE_COLOR: Record<number, string> = { 1: '#4ade80', 2: '#86efac', 3: '#fbbf24', 4: '#f97316', 5: '#f87171' };
+const CONF_COLOR: Record<string, string> = { high: '#4ade80', medium: '#fbbf24', low: '#f87171' };
 
 interface Recommendation {
   id: string;
@@ -132,9 +163,13 @@ type EditPersonaForm = {
 
 export default function AssessmentsPage() {
   const [risks, setRisks] = useState<RiskSuggestion[]>([]);
+  const [kris, setKRIs] = useState<KeyRiskIndicator[]>([]);
   const [deferredRiskIds, setDeferredRiskIds] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState(0);
   const [expandedRec, setExpandedRec] = useState<string | null>(null);
+  const [expandedPersonaId, setExpandedPersonaId] = useState<string | null>(null);
+  const [groupBy, setGroupBy] = useState<'recommendation' | 'category' | 'owner' | 'urgency'>('recommendation');
+  const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null);
   const [detailGroup, setDetailGroup] = useState<AssessmentGroup | null>(null);
   const [existingFilter, setExistingFilter] = useState<'all' | 'in_progress' | 'completed'>('all');
 
@@ -160,9 +195,37 @@ export default function AssessmentsPage() {
   });
 
   const [snackMessage, setSnackMessage] = useState<string | null>(null);
+  // Results panel state for Tab 1
+  const [expandedResultGroupId, setExpandedResultGroupId] = useState<string | null>(null);
+  const [expandedRiskResultId, setExpandedRiskResultId] = useState<string | null>(null);
+  // AI prompt for persona editing
+  const [personaAIPrompt, setPersonaAIPrompt] = useState('');
+  const [personaAIApplying, setPersonaAIApplying] = useState(false);
 
-  useEffect(() => { setRisks(getApprovedRisks()); }, []);
+  useEffect(() => {
+    setRisks(getApprovedRisks());
+    setKRIs(getKRIs());
+  }, []);
   useEffect(() => { setPersonas(getPersonas()); }, []);
+
+  // ── Start assessment handler ─────────────────────────────────────────────
+  function startAssessment(affectedCategory?: string, specificRisks?: RiskSuggestion[]) {
+    const toStart = specificRisks
+      ?? (affectedCategory
+        ? risks.filter(r => r.category === affectedCategory && r.assessmentStatus === 'unassessed')
+        : risks.filter(r => r.assessmentStatus === 'unassessed').slice(0, 5));
+    if (toStart.length === 0) {
+      setSnackMessage('No unassessed risks to start');
+      return;
+    }
+    toStart.forEach(r => updateApprovedRisk(r.id, { assessmentStatus: 'in_progress' }));
+    const updated = getApprovedRisks();
+    setRisks(updated);
+    setActiveTab(1);
+    // Auto-expand the newly started category
+    if (affectedCategory) setExpandedResultGroupId(affectedCategory);
+    setSnackMessage(`Assessment started for ${toStart.length} risk${toStart.length !== 1 ? 's' : ''} — ${affectedCategory ? affectedCategory + ' category' : 'selected risks'}`);
+  }
 
   // Priority queue: unassessed risks sorted by score, top 10
   const priorityQueue = useMemo(() =>
@@ -350,6 +413,140 @@ export default function AssessmentsPage() {
     return { recommendations: recs, unassessedRisks: unassessed, highSevUnassessed: highSev };
   }, [risks]);
 
+  // ── Group-by derived data ─────────────────────────────────────────────────
+  const categoryGroups = useMemo(() => {
+    const map: Record<string, RiskSuggestion[]> = {};
+    unassessedRisks.forEach(r => {
+      const key = r.category || 'other';
+      if (!map[key]) map[key] = [];
+      map[key].push(r);
+    });
+    return Object.entries(map)
+      .map(([cat, catRisks]) => ({
+        key: cat,
+        label: cat.charAt(0).toUpperCase() + cat.slice(1),
+        risks: [...catRisks].sort((a, b) => (b.likelihood + b.impact) - (a.likelihood + a.impact)),
+        color: (categoryColors[cat] as string | undefined) || '#6B7280',
+        highSevCount: catRisks.filter(r => Math.round((r.likelihood + r.impact) / 2) >= 4).length,
+      }))
+      .sort((a, b) => b.highSevCount - a.highSevCount || b.risks.length - a.risks.length);
+  }, [unassessedRisks]);
+
+  const ownerGroups = useMemo(() => {
+    const map: Record<string, RiskSuggestion[]> = {};
+    unassessedRisks.forEach(r => {
+      const key = r.suggestedOwner?.name || 'Unassigned';
+      if (!map[key]) map[key] = [];
+      map[key].push(r);
+    });
+    return Object.entries(map)
+      .map(([owner, ownerRisks]) => ({
+        key: owner,
+        label: owner,
+        role: ownerRisks.find(r => r.suggestedOwner?.name === owner)?.suggestedOwner?.role || '',
+        risks: [...ownerRisks].sort((a, b) => (b.likelihood + b.impact) - (a.likelihood + a.impact)),
+        highSevCount: ownerRisks.filter(r => Math.round((r.likelihood + r.impact) / 2) >= 4).length,
+      }))
+      .sort((a, b) => b.highSevCount - a.highSevCount || b.risks.length - a.risks.length);
+  }, [unassessedRisks]);
+
+  const urgencyGroups = useMemo(() => {
+    const bands = [
+      { key: 'critical', label: 'Critical', color: '#f87171', bg: 'rgba(248,113,113,0.12)', border: 'rgba(248,113,113,0.3)', min: 5, max: 5 },
+      { key: 'high',     label: 'High',     color: '#fbbf24', bg: 'rgba(251,191,36,0.10)', border: 'rgba(251,191,36,0.3)',  min: 4, max: 4 },
+      { key: 'medium',   label: 'Medium',   color: '#94a3b8', bg: 'rgba(148,163,184,0.10)', border: 'rgba(148,163,184,0.2)', min: 3, max: 3 },
+      { key: 'low',      label: 'Low',      color: '#4ade80', bg: 'rgba(74,222,128,0.10)', border: 'rgba(74,222,128,0.25)',  min: 1, max: 2 },
+    ];
+    return bands
+      .map(b => ({
+        ...b,
+        risks: unassessedRisks
+          .filter(r => { const s = Math.round((r.likelihood + r.impact) / 2); return s >= b.min && s <= b.max; })
+          .sort((a, b) => (b.likelihood + b.impact) - (a.likelihood + a.impact)),
+      }))
+      .filter(b => b.risks.length > 0);
+  }, [unassessedRisks]);
+
+  // ── Overview stats + priority actions ───────────────────────────────────
+  const overviewStats = useMemo(() => {
+    const assessed    = risks.filter(r => r.assessmentStatus === 'assessed').length;
+    const inProgress  = risks.filter(r => r.assessmentStatus === 'in_progress').length;
+    const overdueGroups = existingAssessmentGroups.filter(g => g.isOverdue);
+    const coverage    = risks.length > 0 ? Math.round((assessed / risks.length) * 100) : 0;
+    const aiDrafts    = Math.min(priorityQueue.length, 3);
+
+    type Action = {
+      id: string;
+      urgency: 'critical' | 'high' | 'medium';
+      Icon: React.ElementType;
+      title: string;
+      subtitle: string;
+      cta: string;
+      tab: number;
+    };
+    const actions: Action[] = [];
+
+    if (highSevUnassessed.length > 0) {
+      actions.push({
+        id: 'high-sev',
+        urgency: highSevUnassessed.length >= 5 ? 'critical' : 'high',
+        Icon: SeverityIcon,
+        title: `${highSevUnassessed.length} high-severity risk${highSevUnassessed.length !== 1 ? 's' : ''} unassessed`,
+        subtitle: 'Highest inherent exposure — required before treatment can begin',
+        cta: 'Start assessment',
+        tab: 0,
+      });
+    }
+
+    if (aiDrafts > 0) {
+      actions.push({
+        id: 'ai-drafts',
+        urgency: 'high',
+        Icon: SparkleIcon,
+        title: `${aiDrafts} AI-drafted assessment${aiDrafts !== 1 ? 's' : ''} awaiting sign-off`,
+        subtitle: 'Agent has prepared drafts for top-priority risks — review and approve',
+        cta: 'Review drafts',
+        tab: 0,
+      });
+    }
+
+    if (overdueGroups.length > 0) {
+      actions.push({
+        id: 'overdue',
+        urgency: 'high',
+        Icon: OverdueIcon,
+        title: `${overdueGroups.length} assessment${overdueGroups.length !== 1 ? 's' : ''} overdue`,
+        subtitle: overdueGroups.slice(0, 2).map(g => g.label).join(', ') + (overdueGroups.length > 2 ? ` +${overdueGroups.length - 2} more` : ''),
+        cta: 'View assessments',
+        tab: 1,
+      });
+    }
+
+    const regRec = recommendations.find(r => r.type === 'regulation' && r.urgency === 'high');
+    if (regRec) {
+      actions.push({
+        id: 'reg',
+        urgency: 'medium',
+        Icon: RegulationIcon,
+        title: regRec.headline,
+        subtitle: regRec.source,
+        cta: 'View queue',
+        tab: 0,
+      });
+    }
+
+    return {
+      total: risks.length,
+      assessed,
+      inProgress,
+      unassessed: unassessedRisks.length,
+      overdueCount: overdueGroups.length,
+      aiDrafts,
+      coverage,
+      actions: actions.slice(0, 4),
+    };
+  }, [risks, existingAssessmentGroups, highSevUnassessed, priorityQueue, recommendations, unassessedRisks]);
+
   const typeConfig: Record<string, { label: string; Icon: React.ElementType }> = {
     priority: { label: 'Risk priority', Icon: ShieldIcon },
     regulation: { label: 'Regulation', Icon: RegulationIcon },
@@ -387,9 +584,12 @@ export default function AssessmentsPage() {
   const handleEditPersona = (persona: AIAssessorPersona) => {
     if (editingPersonaId === persona.id) {
       setEditingPersonaId(null);
+      setPersonaAIPrompt('');
     } else {
       setEditingPersonaId(persona.id);
+      setExpandedPersonaId(persona.id);
       setEditForm({ name: persona.name, role: persona.role, perspective: persona.perspective, biases: [...persona.biases], newBias: '' });
+      setPersonaAIPrompt('');
     }
   };
 
@@ -397,7 +597,103 @@ export default function AssessmentsPage() {
     updatePersona(personaId, { name: editForm.name, role: editForm.role, perspective: editForm.perspective, biases: editForm.biases, customisedByUser: true });
     setPersonas(getPersonas());
     setEditingPersonaId(null);
+    setPersonaAIPrompt('');
     setSnackMessage('Persona updated');
+  };
+
+  const handleApplyPersonaPrompt = () => {
+    const p = personaAIPrompt.trim();
+    if (!p || personaAIApplying) return;
+    setPersonaAIApplying(true);
+
+    setTimeout(() => {
+      const lower = p.toLowerCase();
+      let updatedPerspective = editForm.perspective;
+      let updatedBiases = [...editForm.biases];
+      let updatedName = editForm.name;
+      let updatedRole = editForm.role;
+
+      // Name / role changes
+      const renameMatch = lower.match(/rename\s+to\s+["']?([^"']+)["']?/);
+      if (renameMatch) updatedName = renameMatch[1].trim();
+      const roleMatch = lower.match(/(?:change|set|update)\s+role\s+to\s+["']?([^"',.]+)/);
+      if (roleMatch) updatedRole = roleMatch[1].trim();
+
+      // Bias additions
+      if (lower.includes('conserv') || lower.includes('risk-averse') || lower.includes('cautious')) {
+        if (!updatedBiases.includes('Risk-averse')) updatedBiases.push('Risk-averse');
+        updatedBiases = updatedBiases.filter(b => b !== 'Risk-tolerant');
+      }
+      if (lower.includes('risk-tolerant') || lower.includes('aggressive') || lower.includes('growth-oriented')) {
+        if (!updatedBiases.includes('Risk-tolerant')) updatedBiases.push('Risk-tolerant');
+        updatedBiases = updatedBiases.filter(b => b !== 'Risk-averse');
+      }
+      if (lower.includes('cost') || lower.includes('financ') || lower.includes('budget')) {
+        if (!updatedBiases.includes('Cost-conscious')) updatedBiases.push('Cost-conscious');
+      }
+      if (lower.includes('regulat') || lower.includes('compliance') || lower.includes('legal')) {
+        if (!updatedBiases.includes('Regulatory focus')) updatedBiases.push('Regulatory focus');
+      }
+      if (lower.includes('operational') || lower.includes('process') || lower.includes('continuity')) {
+        if (!updatedBiases.includes('Operational continuity')) updatedBiases.push('Operational continuity');
+      }
+      if (lower.includes('data') || lower.includes('privacy') || lower.includes('cyber')) {
+        if (!updatedBiases.includes('Data-centric')) updatedBiases.push('Data-centric');
+      }
+      if (lower.includes('strateg') || lower.includes('long-term') || lower.includes('competitive')) {
+        if (!updatedBiases.includes('Strategic outlook')) updatedBiases.push('Strategic outlook');
+      }
+
+      // Bias removals
+      const removeMatch = lower.match(/remove\s+["']?([^"',.\n]+?)["']?\s+bias/);
+      if (removeMatch) {
+        const toRemove = removeMatch[1].trim().toLowerCase();
+        updatedBiases = updatedBiases.filter(b => !b.toLowerCase().includes(toRemove));
+      }
+
+      // Perspective rewrite based on focus keywords
+      const perspectivePrefix = (() => {
+        if (lower.includes('focus on regulatory') || lower.includes('more compliance')) {
+          return `${updatedName} approaches every risk through a regulatory and compliance lens, ensuring organisational obligations are front-of-mind before operational or financial considerations. `;
+        }
+        if (lower.includes('focus on operational') || lower.includes('more operational')) {
+          return `${updatedName} grounds risk assessments in operational reality — evaluating process resilience, workforce capacity, and system continuity as the primary determinants of risk severity. `;
+        }
+        if (lower.includes('focus on financial') || lower.includes('more financial')) {
+          return `${updatedName} evaluates risk severity primarily through quantified financial impact, applying scenario-based loss modelling and cost-benefit framing to all assessments. `;
+        }
+        if (lower.includes('focus on cyber') || lower.includes('more cyber')) {
+          return `${updatedName} leads with a cyber-security lens, weighting technical threat vectors, vulnerability exposure, and attack surface as primary risk drivers. `;
+        }
+        if (lower.includes('less') && lower.includes('more')) {
+          return `${updatedName} has been recalibrated to shift emphasis as instructed, updating assessment weighting accordingly. `;
+        }
+        if (lower.includes('senior') || lower.includes('executive') || lower.includes('board')) {
+          return `${updatedName} takes an executive-level view, translating technical and operational risk detail into strategic significance and board-level language. `;
+        }
+        return null;
+      })();
+
+      if (perspectivePrefix) {
+        // Prepend new framing, keep original as supporting detail
+        const stripped = updatedPerspective.replace(/^[^.]+\.\s*/, '');
+        updatedPerspective = perspectivePrefix + stripped;
+      } else {
+        // Generic — append agent note
+        updatedPerspective = updatedPerspective + ` [Agent update: ${p.charAt(0).toUpperCase() + p.slice(1, 80)}${p.length > 80 ? '…' : ''}.]`;
+      }
+
+      setEditForm(f => ({
+        ...f,
+        name: updatedName,
+        role: updatedRole,
+        perspective: updatedPerspective,
+        biases: updatedBiases,
+      }));
+      setPersonaAIPrompt('');
+      setPersonaAIApplying(false);
+      setSnackMessage('Agent applied instructions — review and save changes');
+    }, 1100);
   };
 
   const handleTogglePersonaActive = (persona: AIAssessorPersona) => {
@@ -446,11 +742,157 @@ export default function AssessmentsPage() {
       {/* ── Main content column ── */}
       <Box sx={{ flex: 1, minWidth: 0, pl: detailGroup ? 2 : 0, pr: detailGroup ? 2 : 0, transition: 'padding 0.2s ease' }}>
 
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2.5 }}>
           <Typography variant="h4" component="h1" sx={{ fontWeight: 600 }}>
             Assessments
           </Typography>
         </Stack>
+
+        {/* ══════════════════════════════════════════════════════════════════
+            OVERVIEW — stats strip + priority actions (always above tabs)
+        ══════════════════════════════════════════════════════════════════ */}
+        {risks.length > 0 && (() => {
+          const urgencyColor = { critical: '#f87171', high: '#fbbf24', medium: '#94a3b8' };
+          const urgencyBg    = { critical: 'rgba(248,113,113,0.1)', high: 'rgba(251,191,36,0.08)', medium: 'rgba(148,163,184,0.08)' };
+          const urgencyBorder = { critical: 'rgba(248,113,113,0.28)', high: 'rgba(251,191,36,0.25)', medium: 'rgba(148,163,184,0.18)' };
+
+          return (
+            <Box sx={{ mb: 3 }}>
+              {/* Stats strip */}
+              <Grid container spacing={1.5} sx={{ mb: 2 }}>
+                {[
+                  {
+                    label: 'Total risks',
+                    value: overviewStats.total,
+                    sub: 'in register',
+                    color: 'text.primary',
+                    accent: 'rgba(255,255,255,0.06)',
+                  },
+                  {
+                    label: 'Assessed',
+                    value: overviewStats.assessed,
+                    sub: `${overviewStats.coverage}% coverage`,
+                    color: '#4ade80',
+                    accent: 'rgba(74,222,128,0.06)',
+                    progress: overviewStats.coverage,
+                  },
+                  {
+                    label: 'In progress',
+                    value: overviewStats.inProgress,
+                    sub: 'active cycles',
+                    color: '#60a5fa',
+                    accent: 'rgba(96,165,250,0.06)',
+                  },
+                  {
+                    label: 'Unassessed',
+                    value: overviewStats.unassessed,
+                    sub: 'need attention',
+                    color: overviewStats.unassessed > 0 ? '#fbbf24' : '#4ade80',
+                    accent: overviewStats.unassessed > 0 ? 'rgba(251,191,36,0.06)' : 'transparent',
+                  },
+                  {
+                    label: 'Overdue',
+                    value: overviewStats.overdueCount,
+                    sub: 'past target date',
+                    color: overviewStats.overdueCount > 0 ? '#f87171' : '#4ade80',
+                    accent: overviewStats.overdueCount > 0 ? 'rgba(248,113,113,0.06)' : 'transparent',
+                  },
+                  {
+                    label: 'AI drafts ready',
+                    value: overviewStats.aiDrafts,
+                    sub: 'awaiting sign-off',
+                    color: '#93c5fd',
+                    accent: 'rgba(96,165,250,0.06)',
+                  },
+                ].map(stat => (
+                  <Grid key={stat.label} size={{ xs: 6, sm: 4, md: 2 }}>
+                    <Paper variant="outlined" sx={{ p: 1.5, bgcolor: stat.accent, height: '100%' }}>
+                      <Typography variant="h5" sx={{ fontWeight: 700, color: stat.color, lineHeight: 1.15 }}>
+                        {stat.value}
+                        {stat.progress !== undefined && (
+                          <Typography component="span" variant="caption" sx={{ ml: 0.75, fontWeight: 400, color: stat.color, opacity: 0.8 }}>
+                            {stat.progress}%
+                          </Typography>
+                        )}
+                      </Typography>
+                      <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', color: 'text.primary', mt: 0.25 }}>
+                        {stat.label}
+                      </Typography>
+                      <Typography variant="caption" color="text.disabled">{stat.sub}</Typography>
+                      {stat.progress !== undefined && (
+                        <LinearProgress
+                          variant="determinate"
+                          value={stat.progress}
+                          sx={{ mt: 0.75, height: 3, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.07)', '& .MuiLinearProgress-bar': { bgcolor: stat.color, borderRadius: 2 } }}
+                        />
+                      )}
+                    </Paper>
+                  </Grid>
+                ))}
+              </Grid>
+
+              {/* Priority actions */}
+              {overviewStats.actions.length > 0 && (
+                <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+                  <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 2, py: 1.25, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    <PriorityIcon sx={{ fontSize: 15, color: '#f87171' }} />
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Priority actions</Typography>
+                    <Chip size="small" label={overviewStats.actions.length}
+                      sx={{ height: 18, fontSize: '0.68rem', bgcolor: 'rgba(248,113,113,0.1)', color: '#f87171', border: '1px solid rgba(248,113,113,0.25)' }} />
+                    <Typography variant="caption" color="text.disabled" sx={{ ml: 'auto !important' }}>
+                      Requires your attention
+                    </Typography>
+                  </Stack>
+                  {overviewStats.actions.map((action, idx) => {
+                    const color  = urgencyColor[action.urgency];
+                    const bg     = urgencyBg[action.urgency];
+                    const border = urgencyBorder[action.urgency];
+                    const ActionIcon = action.Icon;
+                    return (
+                      <Stack
+                        key={action.id}
+                        direction="row"
+                        alignItems="center"
+                        spacing={1.5}
+                        sx={{
+                          px: 2, py: 1.25,
+                          borderBottom: idx < overviewStats.actions.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                          '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' },
+                        }}
+                      >
+                        {/* Urgency accent bar */}
+                        <Box sx={{ width: 3, alignSelf: 'stretch', borderRadius: 1, bgcolor: color, flexShrink: 0, minHeight: 32 }} />
+
+                        <ActionIcon sx={{ fontSize: 16, color, flexShrink: 0 }} />
+
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.3 }}>{action.title}</Typography>
+                          <Typography variant="caption" color="text.disabled">{action.subtitle}</Typography>
+                        </Box>
+
+                        <Chip
+                          size="small"
+                          label={action.urgency.charAt(0).toUpperCase() + action.urgency.slice(1)}
+                          sx={{ height: 18, fontSize: '0.65rem', fontWeight: 600, bgcolor: bg, color, border: `1px solid ${border}`, flexShrink: 0 }}
+                        />
+
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<ArrowIcon sx={{ fontSize: '14px !important' }} />}
+                          onClick={() => setActiveTab(action.tab)}
+                          sx={{ flexShrink: 0 }}
+                        >
+                          {action.cta}
+                        </Button>
+                      </Stack>
+                    );
+                  })}
+                </Paper>
+              )}
+            </Box>
+          );
+        })()}
 
         <Tabs
           value={activeTab}
@@ -462,20 +904,9 @@ export default function AssessmentsPage() {
             '& .MuiTab-root': { textTransform: 'none' },
           }}
         >
-          <Tab label="Assessment Queue" />
-          <Tab label={
-            <Stack direction="row" spacing={0.75} alignItems="center">
-              <span>AI Assessor Personas</span>
-              <Chip
-                size="small"
-                label="MANAGER ONLY"
-                color="warning"
-                variant="outlined"
-                sx={{ height: 18, fontSize: '0.62rem', fontWeight: 700, pointerEvents: 'none' }}
-              />
-            </Stack>
-          } />
+          <Tab label="Assessment queue" />
           <Tab label="Existing assessments" />
+          <Tab label="AI assessors" />
         </Tabs>
 
         {/* ═══════════════════════════════════════════════
@@ -493,58 +924,60 @@ export default function AssessmentsPage() {
             </Paper>
           ) : (
             <>
-              {/* A) Coverage metrics — compact single-line row */}
-              <Stack
-                direction="row"
-                spacing={1.5}
-                alignItems="center"
-                sx={{ mb: 3, flexWrap: 'wrap', gap: 1 }}
-              >
-                <Typography variant="body2" color="text.secondary">Assessment coverage:</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 700 }}>62%</Typography>
-                <LinearProgress
-                  variant="determinate"
-                  value={62}
-                  sx={{
-                    width: 120, height: 6, borderRadius: 3,
-                    bgcolor: 'rgba(255,255,255,0.08)',
-                    '& .MuiLinearProgress-bar': { bgcolor: '#60a5fa', borderRadius: 3 },
-                  }}
-                />
-                <Typography variant="body2" color="text.disabled">·</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  <Box component="span" sx={{ color: '#f87171', fontWeight: 700 }}>4</Box> high-priority gaps
-                </Typography>
-                <Typography variant="body2" color="text.disabled">·</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  <Box component="span" sx={{ color: '#fbbf24', fontWeight: 700 }}>2</Box> overdue
-                </Typography>
-                <Typography variant="body2" color="text.disabled">·</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  <Box component="span" sx={{ color: '#60a5fa', fontWeight: 700 }}>3</Box> awaiting synthesis
-                </Typography>
-              </Stack>
-
-              {/* D) Smart recommendations (with KRI linkages) */}
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.75 }}>
+              {/* Section header + grouping toolbar */}
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
                 <SparkleIcon sx={{ fontSize: 18, color: 'primary.light' }} />
                 <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                  Recommended assessments
+                  Assessment queue
                 </Typography>
-                <Chip size="small" label={`${recommendations.length} triggers`} sx={{ height: 20, fontSize: '0.7rem' }} />
+                <Chip size="small" label={`${recommendations.length} recommendations`} sx={{ height: 20, fontSize: '0.7rem' }} />
+                <Chip size="small" label={`${priorityQueue.length} in queue`} sx={{ height: 20, fontSize: '0.7rem' }} />
               </Stack>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Based on your risk register, active regulations, and industry intelligence — sorted by urgency.
-              </Typography>
 
-              <Stack spacing={1} sx={{ mb: 3 }}>
+              {/* Group-by selector */}
+              <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 2 }}>
+                <SortIcon sx={{ fontSize: 15, color: 'text.disabled' }} />
+                <Typography variant="caption" color="text.disabled" sx={{ fontWeight: 600, mr: 0.25 }}>
+                  Group by:
+                </Typography>
+                {([
+                  { key: 'recommendation', label: 'Recommendation', icon: SparkleIcon },
+                  { key: 'category',       label: 'Category',       icon: CategoryIcon },
+                  { key: 'owner',          label: 'Owner',          icon: PersonIcon },
+                  { key: 'urgency',        label: 'Urgency',        icon: SeverityIcon },
+                ] as const).map(({ key, label, icon: Icon }) => {
+                  const active = groupBy === key;
+                  return (
+                    <Chip
+                      key={key}
+                      size="small"
+                      icon={<Icon sx={{ fontSize: '13px !important' }} />}
+                      label={label}
+                      onClick={() => { setGroupBy(key); setExpandedGroupKey(null); setExpandedRec(null); }}
+                      sx={{
+                        height: 24, fontSize: '0.72rem', cursor: 'pointer',
+                        bgcolor: active ? 'rgba(96,165,250,0.15)' : 'transparent',
+                        color: active ? '#93c5fd' : 'text.secondary',
+                        border: active ? '1px solid rgba(96,165,250,0.38)' : '1px solid rgba(255,255,255,0.1)',
+                        '& .MuiChip-icon': { color: active ? '#60a5fa' : 'inherit' },
+                        '&:hover': { bgcolor: 'rgba(96,165,250,0.1)', borderColor: 'rgba(96,165,250,0.3)' },
+                      }}
+                    />
+                  );
+                })}
+              </Stack>
+
+              {/* ── Recommendation grouping (default) ── */}
+              {groupBy === 'recommendation' && (
+              <Stack spacing={1}>
                 {recommendations.map((rec, recIdx) => {
                   const tc = typeConfig[rec.type];
                   const uc = urgencyConfig[rec.urgency];
                   const TypeIcon = tc.Icon;
                   const isOpen = expandedRec === rec.id;
-                  const kriLinkage = recIdx < KRI_LINKAGES.length ? KRI_LINKAGES[recIdx] : null;
+                  const kriLinkage = getKRILinkageText(kris, rec.affectedCategory ?? '');
 
+                  // Resolve affected risks for this recommendation
                   let recRisks = risks;
                   if (rec.affectedCategory) {
                     recRisks = risks.filter(r => r.category === rec.affectedCategory);
@@ -556,273 +989,417 @@ export default function AssessmentsPage() {
 
                   return (
                     <Paper key={rec.id} variant="outlined" sx={{ overflow: 'hidden' }}>
-                      <Box sx={{ px: 2, py: 1.25, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Box
-                          onClick={() => setExpandedRec(isOpen ? null : rec.id)}
-                          sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1, minWidth: 0, cursor: 'pointer' }}
-                        >
-                          <TypeIcon sx={{ fontSize: 16, color: 'text.secondary', flexShrink: 0 }} />
-                          <Box sx={{ minWidth: 0 }}>
-                            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ gap: 0.5 }}>
-                              <Typography variant="body2" sx={{ fontWeight: 600 }}>{rec.headline}</Typography>
-                              <Chip
-                                size="small"
-                                label={uc.label}
-                                sx={{ height: 17, fontSize: '0.75rem', fontWeight: 600, bgcolor: uc.bg, color: uc.color, flexShrink: 0 }}
-                              />
-                            </Stack>
-                            <Typography variant="caption" color="text.disabled">{tc.label}</Typography>
-                            {kriLinkage && (
-                              <Typography variant="caption" sx={{ display: 'block', color: '#f87171', mt: 0.25 }}>
-                                {kriLinkage}
-                              </Typography>
+                      {/* ── Card header — full row clickable, chevron rightmost ── */}
+                      <Stack
+                        direction="row"
+                        alignItems="center"
+                        spacing={1.5}
+                        onClick={() => setExpandedRec(isOpen ? null : rec.id)}
+                        sx={{ px: 2, py: 1.5, cursor: 'pointer', userSelect: 'none' }}
+                      >
+                        <TypeIcon sx={{ fontSize: 16, color: 'text.secondary', flexShrink: 0 }} />
+
+                        {/* Title + meta */}
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ gap: 0.5 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>{rec.headline}</Typography>
+                            <Chip
+                              size="small"
+                              label={uc.label}
+                              sx={{ height: 17, fontSize: '0.68rem', fontWeight: 600, bgcolor: uc.bg, color: uc.color, flexShrink: 0 }}
+                            />
+                            {rec.affectedCount !== undefined && (
+                              <Chip size="small" label={`${rec.affectedCount} risks`}
+                                sx={{ height: 17, fontSize: '0.68rem' }} />
                             )}
-                          </Box>
+                          </Stack>
+                          <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.25 }}>
+                            <Typography variant="caption" color="text.disabled">
+                              {tc.label} · {rec.source}
+                            </Typography>
+                            {kriLinkage && (
+                              <Typography variant="caption" sx={{ color: '#f87171' }}>{kriLinkage}</Typography>
+                            )}
+                          </Stack>
                         </Box>
 
-                        <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0 }}>
+                        {/* Actions — stop propagation so clicking doesn't toggle card */}
+                        <Stack direction="row" spacing={0.75} alignItems="center" onClick={(e) => e.stopPropagation()}>
                           <Button
                             size="small"
                             variant="outlined"
-                            endIcon={<OpenInNewIcon sx={{ fontSize: '14px !important' }} />}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDetailGroup({
-                                id: `rec-${rec.id}`,
-                                label: rec.headline,
-                                description: rec.reasoning,
-                                risks: recRisks,
-                                source: rec.source,
-                                urgency: rec.urgency,
-                                recType: rec.type,
-                              });
-                            }}
+                            startIcon={<OpenInNewIcon sx={{ fontSize: '14px !important' }} />}
+                            onClick={() => setDetailGroup({
+                              id: `rec-${rec.id}`,
+                              label: rec.headline,
+                              description: rec.reasoning,
+                              risks: recRisks,
+                              source: rec.source,
+                              urgency: rec.urgency,
+                              recType: rec.type,
+                            })}
                           >
-                            Show details
+                            Details
                           </Button>
                           <Button
                             size="small"
                             variant="contained"
-                            onClick={() => setSnackMessage('Assessment added to queue')}
+                            startIcon={<PlayArrowIcon />}
+                            onClick={() => startAssessment(rec.affectedCategory, rec.id === 'prio-high' ? highSevUnassessed : undefined)}
                           >
-                            Start assessment
+                            Start
                           </Button>
-                          <Box
-                            onClick={() => setExpandedRec(isOpen ? null : rec.id)}
-                            sx={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'text.secondary', pl: 0.5 }}
-                          >
-                            {isOpen ? <ExpandLessIcon sx={{ fontSize: 18 }} /> : <ExpandMoreIcon sx={{ fontSize: 18 }} />}
-                          </Box>
                         </Stack>
-                      </Box>
 
+                        {/* Rightmost: rotating chevron */}
+                        <ExpandMoreIcon
+                          sx={{
+                            fontSize: 18,
+                            color: 'text.secondary',
+                            flexShrink: 0,
+                            transition: 'transform 0.2s',
+                            transform: isOpen ? 'rotate(180deg)' : 'none',
+                          }}
+                        />
+                      </Stack>
+
+                      {/* ── Expanded body ── */}
                       <Collapse in={isOpen}>
-                        <Box sx={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                          <Box sx={{ px: 2, pt: 1.5, pb: 1.25 }}>
-                            <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.75, mb: 1 }}>
-                              {rec.reasoning}
-                            </Typography>
-                            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ gap: 0.5 }}>
-                              <Typography variant="caption" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                                {rec.source}
-                              </Typography>
-                              {rec.affectedCount !== undefined && (
-                                <Chip size="small" label={`${rec.affectedCount} risk${rec.affectedCount !== 1 ? 's' : ''} affected`} sx={{ height: 18, fontSize: '0.75rem' }} />
-                              )}
-                              {rec.affectedCategory && (
-                                <Chip size="small" label={rec.affectedCategory.charAt(0).toUpperCase() + rec.affectedCategory.slice(1)} sx={{ height: 18, fontSize: '0.75rem' }} />
-                              )}
-                            </Stack>
-                          </Box>
-                          {recRisks.length > 0 && (
-                            <Box sx={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                              <TableContainer>
-                                <Table size="small">
-                                  <TableHead>
-                                    <TableRow sx={{ bgcolor: 'rgba(13,17,23,0.5)' }}>
-                                      <TableCell sx={{ fontWeight: 600, width: 80 }}>ID</TableCell>
-                                      <TableCell sx={{ fontWeight: 600 }}>Risk</TableCell>
-                                      <TableCell sx={{ fontWeight: 600 }}>Category</TableCell>
-                                      <TableCell sx={{ fontWeight: 600 }}>Inherent score</TableCell>
-                                      <TableCell sx={{ fontWeight: 600 }}>Owner</TableCell>
-                                    </TableRow>
-                                  </TableHead>
-                                  <TableBody>
-                                    {recRisks.map(risk => (
-                                      <TableRow key={risk.id} hover>
-                                        <TableCell>
-                                          <Typography variant="caption" sx={{ fontFamily: 'monospace', fontWeight: 700, color: 'text.secondary', letterSpacing: '0.02em' }}>
-                                            {getRiskDisplayId(risk.id, risks)}
-                                          </Typography>
-                                        </TableCell>
-                                        <TableCell>
-                                          <Typography variant="body2" sx={{ fontWeight: 500 }}>{risk.title}</Typography>
-                                        </TableCell>
-                                        <TableCell>
-                                          <Chip size="small" label={risk.category.charAt(0).toUpperCase() + risk.category.slice(1)} variant="outlined"
-                                            sx={{ height: 22, fontSize: '0.75rem', borderColor: 'rgba(255,255,255,0.15)', color: 'text.secondary' }} />
-                                        </TableCell>
-                                        <TableCell>
-                                          <Stack direction="row" spacing={1} alignItems="center">
-                                            <Box sx={{ width: 10, height: 10, borderRadius: 0.5, bgcolor: getScoreColor(risk) }} />
-                                            <Typography variant="body2">{getScoreLabel(risk)}</Typography>
-                                          </Stack>
-                                        </TableCell>
-                                        <TableCell>
-                                          {risk.suggestedOwner ? (
-                                            <Stack direction="row" spacing={1} alignItems="center">
-                                              <Avatar sx={{ width: 24, height: 24, fontSize: '0.75rem', bgcolor: ownerColors[risk.suggestedOwner.name] || '#6B7280' }}>
-                                                {risk.suggestedOwner.name.split(' ').map(n => n[0]).join('')}
-                                              </Avatar>
-                                              <Typography variant="body2">{risk.suggestedOwner.name}</Typography>
-                                            </Stack>
-                                          ) : (
-                                            <Typography variant="body2" color="text.secondary">Unassigned</Typography>
-                                          )}
-                                        </TableCell>
-                                      </TableRow>
-                                    ))}
-                                  </TableBody>
-                                </Table>
-                              </TableContainer>
-                            </Box>
-                          )}
+                        <Divider />
+
+                        {/* Reasoning + source chips */}
+                        <Box sx={{ px: 2, py: 1.5 }}>
+                          <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.75, mb: 1 }}>
+                            {rec.reasoning}
+                          </Typography>
+                          <Stack direction="row" spacing={0.75} flexWrap="wrap" sx={{ gap: 0.5 }}>
+                            <Chip size="small" icon={<SparkleIcon sx={{ fontSize: '12px !important' }} />}
+                              label={rec.source}
+                              sx={{ height: 20, fontSize: '0.68rem', bgcolor: 'rgba(96,165,250,0.08)', color: 'primary.light', border: '1px solid rgba(96,165,250,0.2)' }} />
+                            {rec.affectedCategory && (
+                              <Chip size="small" label={rec.affectedCategory.charAt(0).toUpperCase() + rec.affectedCategory.slice(1)}
+                                sx={{ height: 20, fontSize: '0.68rem',
+                                  bgcolor: `${categoryColors[rec.affectedCategory] || '#6B7280'}18`,
+                                  color: categoryColors[rec.affectedCategory] || 'text.secondary',
+                                  border: `1px solid ${categoryColors[rec.affectedCategory] || '#6B7280'}40` }} />
+                            )}
+                          </Stack>
                         </Box>
+
+                        {/* Affected risks — with inline queue actions */}
+                        {recRisks.length > 0 && (
+                          <Box sx={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                            {recRisks.map((risk, rIdx) => {
+                              const queueIdx = priorityQueue.findIndex(q => q.id === risk.id);
+                              const inQueue = queueIdx >= 0;
+                              const hasDraft = inQueue && queueIdx < 3;
+
+                              return (
+                                <Box
+                                  key={risk.id}
+                                  sx={{
+                                    px: 2, py: 1.25,
+                                    borderBottom: rIdx < recRisks.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                                    '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' },
+                                  }}
+                                >
+                                  <Stack direction="row" alignItems="center" spacing={1.5}>
+                                    {/* Queue rank badge */}
+                                    {inQueue && (
+                                      <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.disabled', minWidth: 22, textAlign: 'right', flexShrink: 0 }}>
+                                        #{queueIdx + 1}
+                                      </Typography>
+                                    )}
+
+                                    {/* Risk identity */}
+                                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                                      <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ gap: 0.5 }}>
+                                        <Typography variant="caption" sx={{ fontFamily: 'monospace', fontWeight: 700, color: 'text.disabled', flexShrink: 0 }}>
+                                          {getRiskDisplayId(risk.id, risks)}
+                                        </Typography>
+                                        <Chip
+                                          size="small"
+                                          label={risk.category.charAt(0).toUpperCase() + risk.category.slice(1)}
+                                          sx={{
+                                            height: 18, fontSize: '0.65rem', flexShrink: 0,
+                                            bgcolor: `${categoryColors[risk.category] || '#6B7280'}18`,
+                                            color: categoryColors[risk.category] || 'text.secondary',
+                                            border: `1px solid ${categoryColors[risk.category] || '#6B7280'}35`,
+                                          }}
+                                        />
+                                        <Typography variant="body2" sx={{ fontWeight: 500 }}>{risk.title}</Typography>
+                                        {hasDraft && (
+                                          <Chip size="small" label="AGENT DRAFTED"
+                                            sx={{ height: 17, fontSize: '0.62rem', fontWeight: 700,
+                                              bgcolor: 'rgba(96,165,250,0.12)', color: '#60a5fa',
+                                              border: '1px solid rgba(96,165,250,0.3)', flexShrink: 0 }} />
+                                        )}
+                                      </Stack>
+                                      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.25 }}>
+                                        <Stack direction="row" spacing={0.5} alignItems="center">
+                                          <Box sx={{ width: 8, height: 8, borderRadius: 0.5, bgcolor: getScoreColor(risk), flexShrink: 0 }} />
+                                          <Typography variant="caption" color="text.secondary">
+                                            {getScoreLabel(risk)}
+                                          </Typography>
+                                        </Stack>
+                                        {inQueue && (
+                                          <Typography variant="caption" sx={{ color: hasDraft ? '#f87171' : 'text.disabled' }}>
+                                            {hasDraft ? 'KRI signal: RED' : '90d unassessed'}
+                                          </Typography>
+                                        )}
+                                        {risk.suggestedOwner && (
+                                          <Stack direction="row" spacing={0.5} alignItems="center">
+                                            <Avatar sx={{ width: 16, height: 16, fontSize: '0.55rem', bgcolor: ownerColors[risk.suggestedOwner.name] || '#6B7280' }}>
+                                              {risk.suggestedOwner.name.split(' ').map(n => n[0]).join('')}
+                                            </Avatar>
+                                            <Typography variant="caption" color="text.secondary">{risk.suggestedOwner.name}</Typography>
+                                          </Stack>
+                                        )}
+                                      </Stack>
+                                    </Box>
+
+                                    {/* Row-level actions */}
+                                    <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }}>
+                                      {inQueue ? (
+                                        <>
+                                          <Button size="small" variant="outlined"
+                                            onClick={() => openDraft(risk, queueIdx)}>
+                                            Review draft
+                                          </Button>
+                                          <Button size="small" variant="contained" startIcon={<CheckIcon />}
+                                            onClick={() => setSnackMessage('Assessment approved')}>
+                                            Approve
+                                          </Button>
+                                          <Button size="small" variant="text" sx={{ color: 'text.secondary' }}
+                                            onClick={() => { setDeferredRiskIds(prev => new Set([...prev, risk.id])); setSnackMessage('Deferred'); }}>
+                                            Defer
+                                          </Button>
+                                        </>
+                                      ) : (
+                                        <Button size="small" variant="outlined" startIcon={<PlayArrowIcon />}
+                                          onClick={() => setSnackMessage('Assessment started')}>
+                                          Assess
+                                        </Button>
+                                      )}
+                                    </Stack>
+                                  </Stack>
+                                </Box>
+                              );
+                            })}
+                          </Box>
+                        )}
                       </Collapse>
                     </Paper>
                   );
                 })}
               </Stack>
+              )}
 
-              {/* C) Priority Assessment Queue */}
-              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Priority Assessment Queue</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Ranked by risk score · Top {priorityQueue.length}
-                </Typography>
-              </Stack>
-
-              <Stack spacing={1.5}>
-                {priorityQueue.length === 0 ? (
-                  <Paper variant="outlined" sx={{ p: 3, textAlign: 'center' }}>
-                    <Typography variant="body2" color="text.secondary">
-                      All risks have been assessed or deferred.
-                    </Typography>
-                  </Paper>
-                ) : (
-                  priorityQueue.map((risk, idx) => (
-                    <Paper
-                      key={risk.id}
-                      variant="outlined"
-                      sx={{
-                        p: 2,
-                        bgcolor: 'rgba(255,255,255,0.03)',
-                        borderColor: idx < 3 ? 'rgba(96,165,250,0.2)' : 'divider',
-                        borderLeft: idx < 3 ? '3px solid rgba(96,165,250,0.4)' : '1px solid',
-                        borderLeftColor: idx < 3 ? 'rgba(96,165,250,0.4)' : 'divider',
-                      }}
-                    >
-                      <Stack spacing={1}>
-                        {/* Header row */}
-                        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ gap: 0.5, flex: 1, mr: 1 }}>
-                            <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.disabled', minWidth: 26 }}>
-                              #{idx + 1}
-                            </Typography>
-                            <Chip
-                              size="small"
-                              label={risk.category.charAt(0).toUpperCase() + risk.category.slice(1)}
-                              variant="outlined"
-                              sx={{
-                                height: 20, fontSize: '0.7rem',
-                                borderColor: (categoryColors[risk.category] as string | undefined) ? `${categoryColors[risk.category]}60` : 'rgba(255,255,255,0.2)',
-                                color: categoryColors[risk.category] || 'text.secondary',
-                              }}
-                            />
-                            <Typography variant="caption" sx={{ fontFamily: 'monospace', fontWeight: 700, color: 'text.secondary' }}>
-                              {getRiskDisplayId(risk.id, risks)}
-                            </Typography>
-                            <Typography variant="body2" sx={{ fontWeight: 600 }}>{risk.title}</Typography>
-                          </Stack>
-                          {idx < 3 && (
-                            <Chip
-                              size="small"
-                              label="AGENT DRAFTED"
-                              sx={{
-                                height: 20, fontSize: '0.65rem', fontWeight: 700, flexShrink: 0,
-                                bgcolor: 'rgba(96,165,250,0.12)', color: '#60a5fa',
-                                border: '1px solid rgba(96,165,250,0.3)',
-                              }}
-                            />
-                          )}
-                        </Stack>
-
-                        {/* Priority reason */}
-                        <Typography variant="caption" color="text.secondary">
-                          Priority reason:{' '}
-                          <Box component="span" sx={{ color: idx < 3 ? '#f87171' : 'text.secondary', fontWeight: 600 }}>
-                            {idx < 3 ? 'KRI signal: RED' : '90d unassessed'}
+              {/* ── Category grouping ── */}
+              {groupBy === 'category' && (
+                <Stack spacing={1}>
+                  {categoryGroups.map(g => {
+                    const isOpen = expandedGroupKey === g.key;
+                    return (
+                      <Paper key={g.key} variant="outlined" sx={{ overflow: 'hidden' }}>
+                        <Stack direction="row" alignItems="center" spacing={1.5}
+                          onClick={() => setExpandedGroupKey(isOpen ? null : g.key)}
+                          sx={{ px: 2, py: 1.5, cursor: 'pointer', userSelect: 'none' }}>
+                          <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: g.color, flexShrink: 0 }} />
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ gap: 0.5 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 600 }}>{g.label}</Typography>
+                              <Chip size="small" label={`${g.risks.length} risks`} sx={{ height: 17, fontSize: '0.68rem' }} />
+                              {g.highSevCount > 0 && (
+                                <Chip size="small" label={`${g.highSevCount} high severity`}
+                                  sx={{ height: 17, fontSize: '0.68rem', bgcolor: 'rgba(248,113,113,0.12)', color: '#f87171', border: '1px solid rgba(248,113,113,0.3)' }} />
+                              )}
+                            </Stack>
+                            <Typography variant="caption" color="text.disabled">Category</Typography>
                           </Box>
-                          {' · '}
-                          {idx < 3 ? '14d since last assessment' : 'Never assessed'}
-                        </Typography>
-
-                        {/* Inherent + Owner */}
-                        <Typography variant="caption" color="text.secondary">
-                          Inherent:{' '}
-                          <Box component="span" sx={{ color: 'text.primary', fontWeight: 600 }}>L:{risk.likelihood}</Box>
-                          {' × '}
-                          <Box component="span" sx={{ color: 'text.primary', fontWeight: 600 }}>I:{risk.impact}</Box>
-                          {'  ·  '}
-                          Owner: {risk.suggestedOwner?.name || 'Unassigned'}
-                        </Typography>
-
-                        {/* Actions */}
-                        <Stack direction="row" spacing={1} sx={{ pt: 0.5 }}>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={() => openDraft(risk, idx)}
-                          >
-                            Review draft
-                          </Button>
-                          <Button
-                            size="small"
-                            variant="contained"
-                            onClick={() => setSnackMessage('Assessment approved')}
-                          >
-                            Approve draft
-                          </Button>
-                          <Button
-                            size="small"
-                            variant="text"
-                            sx={{ color: 'text.secondary' }}
-                            onClick={() => {
-                              setDeferredRiskIds(prev => new Set([...prev, risk.id]));
-                              setSnackMessage('Deferred from this cycle');
-                            }}
-                          >
-                            Defer
-                          </Button>
+                          <Stack direction="row" spacing={0.75} onClick={e => e.stopPropagation()}>
+                            <Button size="small" variant="contained" startIcon={<PlayArrowIcon />}
+                              onClick={() => setSnackMessage('Assessment started')}>Start</Button>
+                          </Stack>
+                          <ExpandMoreIcon sx={{ fontSize: 18, color: 'text.secondary', flexShrink: 0, transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'none' }} />
                         </Stack>
-                      </Stack>
-                    </Paper>
-                  ))
-                )}
-              </Stack>
+                        <Collapse in={isOpen}>
+                          <Divider />
+                          {g.risks.map((risk, rIdx) => {
+                            const queueIdx = priorityQueue.findIndex(q => q.id === risk.id);
+                            const inQueue = queueIdx >= 0;
+                            const hasDraft = inQueue && queueIdx < 3;
+                            return (
+                              <Box key={risk.id} sx={{ px: 2, py: 1.25, borderBottom: rIdx < g.risks.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' } }}>
+                                <Stack direction="row" alignItems="center" spacing={1.5}>
+                                  {inQueue && <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.disabled', minWidth: 22, textAlign: 'right', flexShrink: 0 }}>#{queueIdx + 1}</Typography>}
+                                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                                    <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ gap: 0.5 }}>
+                                      <Typography variant="caption" sx={{ fontFamily: 'monospace', fontWeight: 700, color: 'text.disabled', flexShrink: 0 }}>{getRiskDisplayId(risk.id, risks)}</Typography>
+                                      <Typography variant="body2" sx={{ fontWeight: 500 }}>{risk.title}</Typography>
+                                      {hasDraft && <Chip size="small" label="AGENT DRAFTED" sx={{ height: 17, fontSize: '0.62rem', fontWeight: 700, bgcolor: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.3)', flexShrink: 0 }} />}
+                                    </Stack>
+                                    <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.25 }}>
+                                      <Stack direction="row" spacing={0.5} alignItems="center">
+                                        <Box sx={{ width: 8, height: 8, borderRadius: 0.5, bgcolor: getScoreColor(risk), flexShrink: 0 }} />
+                                        <Typography variant="caption" color="text.secondary">{getScoreLabel(risk)}</Typography>
+                                      </Stack>
+                                      {inQueue && <Typography variant="caption" sx={{ color: hasDraft ? '#f87171' : 'text.disabled' }}>{hasDraft ? 'KRI signal: RED' : '90d unassessed'}</Typography>}
+                                      {risk.suggestedOwner && <Stack direction="row" spacing={0.5} alignItems="center"><Avatar sx={{ width: 16, height: 16, fontSize: '0.55rem', bgcolor: ownerColors[risk.suggestedOwner.name] || '#6B7280' }}>{risk.suggestedOwner.name.split(' ').map(n => n[0]).join('')}</Avatar><Typography variant="caption" color="text.secondary">{risk.suggestedOwner.name}</Typography></Stack>}
+                                    </Stack>
+                                  </Box>
+                                  <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }}>
+                                    {inQueue ? (<><Button size="small" variant="outlined" onClick={() => openDraft(risk, queueIdx)}>Review draft</Button><Button size="small" variant="contained" startIcon={<CheckIcon />} onClick={() => setSnackMessage('Assessment approved')}>Approve</Button><Button size="small" variant="text" sx={{ color: 'text.secondary' }} onClick={() => { setDeferredRiskIds(prev => new Set([...prev, risk.id])); setSnackMessage('Deferred'); }}>Defer</Button></>) : (<Button size="small" variant="outlined" startIcon={<PlayArrowIcon />} onClick={() => setSnackMessage('Assessment started')}>Assess</Button>)}
+                                  </Stack>
+                                </Stack>
+                              </Box>
+                            );
+                          })}
+                        </Collapse>
+                      </Paper>
+                    );
+                  })}
+                </Stack>
+              )}
+
+              {/* ── Owner grouping ── */}
+              {groupBy === 'owner' && (
+                <Stack spacing={1}>
+                  {ownerGroups.map(g => {
+                    const isOpen = expandedGroupKey === g.key;
+                    const initials = g.key !== 'Unassigned' ? g.key.split(' ').map(n => n[0]).join('') : '?';
+                    return (
+                      <Paper key={g.key} variant="outlined" sx={{ overflow: 'hidden' }}>
+                        <Stack direction="row" alignItems="center" spacing={1.5}
+                          onClick={() => setExpandedGroupKey(isOpen ? null : g.key)}
+                          sx={{ px: 2, py: 1.5, cursor: 'pointer', userSelect: 'none' }}>
+                          <Avatar sx={{ width: 28, height: 28, fontSize: '0.65rem', fontWeight: 700, bgcolor: ownerColors[g.key] || '#6B7280', flexShrink: 0 }}>{initials}</Avatar>
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ gap: 0.5 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 600 }}>{g.label}</Typography>
+                              <Chip size="small" label={`${g.risks.length} risks`} sx={{ height: 17, fontSize: '0.68rem' }} />
+                              {g.highSevCount > 0 && <Chip size="small" label={`${g.highSevCount} high severity`} sx={{ height: 17, fontSize: '0.68rem', bgcolor: 'rgba(248,113,113,0.12)', color: '#f87171', border: '1px solid rgba(248,113,113,0.3)' }} />}
+                            </Stack>
+                            <Typography variant="caption" color="text.disabled">{g.role || 'Owner'}</Typography>
+                          </Box>
+                          <Stack direction="row" spacing={0.75} onClick={e => e.stopPropagation()}>
+                            <Button size="small" variant="contained" startIcon={<PlayArrowIcon />} onClick={() => setSnackMessage('Assessment started')}>Start</Button>
+                          </Stack>
+                          <ExpandMoreIcon sx={{ fontSize: 18, color: 'text.secondary', flexShrink: 0, transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'none' }} />
+                        </Stack>
+                        <Collapse in={isOpen}>
+                          <Divider />
+                          {g.risks.map((risk, rIdx) => {
+                            const queueIdx = priorityQueue.findIndex(q => q.id === risk.id);
+                            const inQueue = queueIdx >= 0;
+                            const hasDraft = inQueue && queueIdx < 3;
+                            return (
+                              <Box key={risk.id} sx={{ px: 2, py: 1.25, borderBottom: rIdx < g.risks.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' } }}>
+                                <Stack direction="row" alignItems="center" spacing={1.5}>
+                                  {inQueue && <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.disabled', minWidth: 22, textAlign: 'right', flexShrink: 0 }}>#{queueIdx + 1}</Typography>}
+                                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                                    <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ gap: 0.5 }}>
+                                      <Typography variant="caption" sx={{ fontFamily: 'monospace', fontWeight: 700, color: 'text.disabled', flexShrink: 0 }}>{getRiskDisplayId(risk.id, risks)}</Typography>
+                                      <Chip size="small" label={risk.category.charAt(0).toUpperCase() + risk.category.slice(1)} sx={{ height: 18, fontSize: '0.65rem', bgcolor: `${(categoryColors[risk.category] as string | undefined) || '#6B7280'}18`, color: (categoryColors[risk.category] as string | undefined) || 'text.secondary', border: `1px solid ${(categoryColors[risk.category] as string | undefined) || '#6B7280'}35` }} />
+                                      <Typography variant="body2" sx={{ fontWeight: 500 }}>{risk.title}</Typography>
+                                      {hasDraft && <Chip size="small" label="AGENT DRAFTED" sx={{ height: 17, fontSize: '0.62rem', fontWeight: 700, bgcolor: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.3)', flexShrink: 0 }} />}
+                                    </Stack>
+                                    <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.25 }}>
+                                      <Stack direction="row" spacing={0.5} alignItems="center">
+                                        <Box sx={{ width: 8, height: 8, borderRadius: 0.5, bgcolor: getScoreColor(risk), flexShrink: 0 }} />
+                                        <Typography variant="caption" color="text.secondary">{getScoreLabel(risk)}</Typography>
+                                      </Stack>
+                                      {inQueue && <Typography variant="caption" sx={{ color: hasDraft ? '#f87171' : 'text.disabled' }}>{hasDraft ? 'KRI signal: RED' : '90d unassessed'}</Typography>}
+                                    </Stack>
+                                  </Box>
+                                  <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }}>
+                                    {inQueue ? (<><Button size="small" variant="outlined" onClick={() => openDraft(risk, queueIdx)}>Review draft</Button><Button size="small" variant="contained" startIcon={<CheckIcon />} onClick={() => setSnackMessage('Assessment approved')}>Approve</Button><Button size="small" variant="text" sx={{ color: 'text.secondary' }} onClick={() => { setDeferredRiskIds(prev => new Set([...prev, risk.id])); setSnackMessage('Deferred'); }}>Defer</Button></>) : (<Button size="small" variant="outlined" startIcon={<PlayArrowIcon />} onClick={() => setSnackMessage('Assessment started')}>Assess</Button>)}
+                                  </Stack>
+                                </Stack>
+                              </Box>
+                            );
+                          })}
+                        </Collapse>
+                      </Paper>
+                    );
+                  })}
+                </Stack>
+              )}
+
+              {/* ── Urgency grouping ── */}
+              {groupBy === 'urgency' && (
+                <Stack spacing={1}>
+                  {urgencyGroups.map(g => {
+                    const isOpen = expandedGroupKey === g.key;
+                    return (
+                      <Paper key={g.key} variant="outlined" sx={{ overflow: 'hidden' }}>
+                        <Stack direction="row" alignItems="center" spacing={1.5}
+                          onClick={() => setExpandedGroupKey(isOpen ? null : g.key)}
+                          sx={{ px: 2, py: 1.5, cursor: 'pointer', userSelect: 'none' }}>
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ gap: 0.5 }}>
+                              <Chip size="small" label={g.label} sx={{ height: 18, fontSize: '0.7rem', fontWeight: 700, bgcolor: g.bg, color: g.color, border: `1px solid ${g.border}` }} />
+                              <Chip size="small" label={`${g.risks.length} risks`} sx={{ height: 17, fontSize: '0.68rem' }} />
+                            </Stack>
+                            <Typography variant="caption" color="text.disabled" sx={{ mt: 0.25, display: 'block' }}>Inherent score {g.key === 'critical' ? '5' : g.key === 'high' ? '4' : g.key === 'medium' ? '3' : '1–2'} / 5</Typography>
+                          </Box>
+                          <Stack direction="row" spacing={0.75} onClick={e => e.stopPropagation()}>
+                            <Button size="small" variant="contained" startIcon={<PlayArrowIcon />} onClick={() => setSnackMessage('Assessment started')}>Start</Button>
+                          </Stack>
+                          <ExpandMoreIcon sx={{ fontSize: 18, color: 'text.secondary', flexShrink: 0, transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'none' }} />
+                        </Stack>
+                        <Collapse in={isOpen}>
+                          <Divider />
+                          {g.risks.map((risk, rIdx) => {
+                            const queueIdx = priorityQueue.findIndex(q => q.id === risk.id);
+                            const inQueue = queueIdx >= 0;
+                            const hasDraft = inQueue && queueIdx < 3;
+                            return (
+                              <Box key={risk.id} sx={{ px: 2, py: 1.25, borderBottom: rIdx < g.risks.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' } }}>
+                                <Stack direction="row" alignItems="center" spacing={1.5}>
+                                  {inQueue && <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.disabled', minWidth: 22, textAlign: 'right', flexShrink: 0 }}>#{queueIdx + 1}</Typography>}
+                                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                                    <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ gap: 0.5 }}>
+                                      <Typography variant="caption" sx={{ fontFamily: 'monospace', fontWeight: 700, color: 'text.disabled', flexShrink: 0 }}>{getRiskDisplayId(risk.id, risks)}</Typography>
+                                      <Chip size="small" label={risk.category.charAt(0).toUpperCase() + risk.category.slice(1)} sx={{ height: 18, fontSize: '0.65rem', bgcolor: `${(categoryColors[risk.category] as string | undefined) || '#6B7280'}18`, color: (categoryColors[risk.category] as string | undefined) || 'text.secondary', border: `1px solid ${(categoryColors[risk.category] as string | undefined) || '#6B7280'}35` }} />
+                                      <Typography variant="body2" sx={{ fontWeight: 500 }}>{risk.title}</Typography>
+                                      {hasDraft && <Chip size="small" label="AGENT DRAFTED" sx={{ height: 17, fontSize: '0.62rem', fontWeight: 700, bgcolor: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.3)', flexShrink: 0 }} />}
+                                    </Stack>
+                                    <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.25 }}>
+                                      <Stack direction="row" spacing={0.5} alignItems="center">
+                                        <Box sx={{ width: 8, height: 8, borderRadius: 0.5, bgcolor: getScoreColor(risk), flexShrink: 0 }} />
+                                        <Typography variant="caption" color="text.secondary">{getScoreLabel(risk)}</Typography>
+                                      </Stack>
+                                      {inQueue && <Typography variant="caption" sx={{ color: hasDraft ? '#f87171' : 'text.disabled' }}>{hasDraft ? 'KRI signal: RED' : '90d unassessed'}</Typography>}
+                                      {risk.suggestedOwner && <Stack direction="row" spacing={0.5} alignItems="center"><Avatar sx={{ width: 16, height: 16, fontSize: '0.55rem', bgcolor: ownerColors[risk.suggestedOwner.name] || '#6B7280' }}>{risk.suggestedOwner.name.split(' ').map(n => n[0]).join('')}</Avatar><Typography variant="caption" color="text.secondary">{risk.suggestedOwner.name}</Typography></Stack>}
+                                    </Stack>
+                                  </Box>
+                                  <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }}>
+                                    {inQueue ? (<><Button size="small" variant="outlined" onClick={() => openDraft(risk, queueIdx)}>Review draft</Button><Button size="small" variant="contained" startIcon={<CheckIcon />} onClick={() => setSnackMessage('Assessment approved')}>Approve</Button><Button size="small" variant="text" sx={{ color: 'text.secondary' }} onClick={() => { setDeferredRiskIds(prev => new Set([...prev, risk.id])); setSnackMessage('Deferred'); }}>Defer</Button></>) : (<Button size="small" variant="outlined" startIcon={<PlayArrowIcon />} onClick={() => setSnackMessage('Assessment started')}>Assess</Button>)}
+                                  </Stack>
+                                </Stack>
+                              </Box>
+                            );
+                          })}
+                        </Collapse>
+                      </Paper>
+                    );
+                  })}
+                </Stack>
+              )}
             </>
           )
         )}
 
         {/* ═══════════════════════════════════════════════
-            TAB 1 — AI Assessor Personas
+            TAB 2 — AI Assessors
         ═══════════════════════════════════════════════ */}
-        {activeTab === 1 && (
+        {activeTab === 2 && (
           <>
             {/* Header row */}
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2.5, flexWrap: 'wrap', gap: 1 }}>
               <Stack direction="row" spacing={2} alignItems="center">
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>AI Assessors</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>AI assessors</Typography>
                 <Typography variant="body2" color="text.secondary">
                   {personas.filter(p => p.active).length} active personas
                 </Typography>
@@ -852,154 +1429,315 @@ export default function AssessmentsPage() {
               </Stack>
             </Stack>
 
-            {/* Persona cards — 2-column grid */}
-            <Grid container spacing={2}>
-              {personas.map(persona => (
-                <Grid key={persona.id} size={{ xs: 12, md: 6 }}>
-                  <Paper variant="outlined" sx={{ p: 2.5, bgcolor: 'rgba(255,255,255,0.02)' }}>
-                    {/* Card header */}
-                    <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1.5 }}>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <Chip
-                          size="small"
-                          label="AI"
-                          sx={{ height: 20, fontSize: '0.65rem', fontWeight: 700, bgcolor: 'rgba(96,165,250,0.15)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.3)' }}
-                        />
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{persona.name}</Typography>
-                      </Stack>
+            {/* Persona accordions — full-width stacked */}
+            <Stack spacing={0.75}>
+              {personas.map(persona => {
+                const isExpanded = expandedPersonaId === persona.id;
+                const isEditing = editingPersonaId === persona.id;
+                return (
+                  <Paper key={persona.id} variant="outlined" sx={{ overflow: 'hidden' }}>
+                    {/* ── Accordion header — full row clickable, actions + chevron rightmost ── */}
+                    <Stack
+                      direction="row"
+                      alignItems="center"
+                      spacing={1.5}
+                      onClick={() => {
+                        const next = isExpanded ? null : persona.id;
+                        setExpandedPersonaId(next);
+                        if (!next) setEditingPersonaId(null);
+                      }}
+                      sx={{ px: 2, py: 1.5, cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      {/* AI badge */}
                       <Chip
                         size="small"
-                        label={persona.active ? 'ACTIVE' : 'INACTIVE'}
+                        label="AI"
+                        sx={{ height: 18, fontSize: '0.62rem', fontWeight: 700, flexShrink: 0,
+                          bgcolor: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.25)' }}
+                      />
+
+                      {/* Identity */}
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ gap: 0.5 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>{persona.name}</Typography>
+                          <Chip
+                            size="small"
+                            label={persona.active ? 'ACTIVE' : 'INACTIVE'}
+                            sx={{
+                              height: 17, fontSize: '0.62rem', fontWeight: 700,
+                              bgcolor: persona.active ? 'rgba(76,175,80,0.12)' : 'rgba(148,163,184,0.08)',
+                              color: persona.active ? '#4caf50' : '#94a3b8',
+                              border: `1px solid ${persona.active ? 'rgba(76,175,80,0.25)' : 'rgba(148,163,184,0.15)'}`,
+                            }}
+                          />
+                          {persona.customisedByUser && (
+                            <Chip size="small" label="EDITED"
+                              sx={{ height: 17, fontSize: '0.62rem', fontWeight: 700,
+                                bgcolor: 'rgba(251,191,36,0.08)', color: '#fbbf24',
+                                border: '1px solid rgba(251,191,36,0.2)' }} />
+                          )}
+                        </Stack>
+                        <Typography variant="caption" color="text.disabled">
+                          {persona.role}{persona.department ? ` · ${persona.department}` : ''}
+                        </Typography>
+                      </Box>
+
+                      {/* Bias preview chips — visible when collapsed */}
+                      {!isExpanded && (
+                        <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0, display: { xs: 'none', sm: 'flex' } }}
+                          onClick={e => e.stopPropagation()}>
+                          {persona.biases.slice(0, 2).map(b => (
+                            <Chip key={b} size="small" label={b} variant="outlined"
+                              sx={{ height: 18, fontSize: '0.62rem', color: 'text.disabled', borderColor: 'rgba(255,255,255,0.1)' }} />
+                          ))}
+                          {persona.biases.length > 2 && (
+                            <Chip size="small" label={`+${persona.biases.length - 2}`} variant="outlined"
+                              sx={{ height: 18, fontSize: '0.62rem', color: 'text.disabled', borderColor: 'rgba(255,255,255,0.1)' }} />
+                          )}
+                        </Stack>
+                      )}
+
+                      {/* Action buttons — stop propagation */}
+                      <Stack direction="row" spacing={0.75} alignItems="center" onClick={e => e.stopPropagation()}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={isEditing ? <CloseIcon sx={{ fontSize: '13px !important' }} /> : <RefreshIcon sx={{ fontSize: '13px !important' }} />}
+                          onClick={() => handleEditPersona(persona)}
+                        >
+                          {isEditing ? 'Cancel' : 'Edit'}
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={persona.active
+                            ? <CloseIcon sx={{ fontSize: '13px !important' }} />
+                            : <CheckIcon sx={{ fontSize: '13px !important' }} />}
+                          onClick={() => handleTogglePersonaActive(persona)}
+                        >
+                          {persona.active ? 'Deactivate' : 'Activate'}
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          startIcon={<PlayArrowIcon sx={{ fontSize: '13px !important' }} />}
+                          onClick={() => setSnackMessage('Persona applied to current assessment cycle')}
+                        >
+                          Apply to cycle
+                        </Button>
+                      </Stack>
+
+                      {/* Rightmost: rotating chevron */}
+                      <ExpandMoreIcon
                         sx={{
-                          height: 20, fontSize: '0.65rem', fontWeight: 700,
-                          bgcolor: persona.active ? 'rgba(76,175,80,0.15)' : 'rgba(148,163,184,0.1)',
-                          color: persona.active ? '#4caf50' : '#94a3b8',
-                          border: `1px solid ${persona.active ? 'rgba(76,175,80,0.3)' : 'rgba(148,163,184,0.2)'}`,
+                          fontSize: 18, color: 'text.secondary', flexShrink: 0,
+                          transition: 'transform 0.2s',
+                          transform: isExpanded ? 'rotate(180deg)' : 'none',
                         }}
                       />
                     </Stack>
 
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 0.25 }}>{persona.role}</Typography>
-                    <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mb: 1.5 }}>{persona.department}</Typography>
+                    {/* ── Expanded body ── */}
+                    <Collapse in={isExpanded}>
+                      <Divider />
+                      <Box sx={{ px: 2, py: 2 }}>
+                        {!isEditing ? (
+                          <Stack spacing={2}>
+                            {/* Perspective */}
+                            <Box>
+                              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block', mb: 0.5 }}>
+                                Perspective
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
+                                {persona.perspective}
+                              </Typography>
+                            </Box>
 
-                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block', mb: 0.5 }}>Perspective</Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, lineHeight: 1.6 }}>{persona.perspective}</Typography>
-
-                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block', mb: 0.75 }}>Known biases</Typography>
-                    <Stack direction="row" flexWrap="wrap" sx={{ gap: 0.5, mb: 1.5 }}>
-                      {persona.biases.map(b => (
-                        <Chip key={b} size="small" label={b} variant="outlined"
-                          sx={{ height: 20, fontSize: '0.7rem', color: 'text.secondary', borderColor: 'rgba(255,255,255,0.12)' }} />
-                      ))}
-                    </Stack>
-
-                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block', mb: 0.75 }}>Source context</Typography>
-                    <Stack direction="row" flexWrap="wrap" sx={{ gap: 0.5, mb: 2 }}>
-                      {persona.sourceContext.map(s => (
-                        <Chip key={s} size="small" label={sourceLabels[s] || s}
-                          sx={{ height: 20, fontSize: '0.7rem', bgcolor: 'rgba(255,255,255,0.06)', color: 'text.secondary' }} />
-                      ))}
-                    </Stack>
-
-                    {/* Action row */}
-                    <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ gap: 0.5 }}>
-                      <Button size="small" variant="outlined" onClick={() => handleEditPersona(persona)}>
-                        {editingPersonaId === persona.id ? 'Cancel edit' : 'Edit persona'}
-                      </Button>
-                      <Button size="small" variant="outlined" onClick={() => handleTogglePersonaActive(persona)}>
-                        {persona.active ? 'Deactivate' : 'Activate'}
-                      </Button>
-                      <Button size="small" variant="outlined" onClick={() => setSnackMessage('Persona applied to current assessment cycle')}>
-                        Apply to cycle
-                      </Button>
-                    </Stack>
-
-                    {/* Inline edit section */}
-                    <Collapse in={editingPersonaId === persona.id}>
-                      <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                        <Stack spacing={1.5}>
-                          <TextField
-                            label="Name" size="small" fullWidth
-                            value={editForm.name}
-                            onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
-                          />
-                          <TextField
-                            label="Role" size="small" fullWidth
-                            value={editForm.role}
-                            onChange={e => setEditForm(f => ({ ...f, role: e.target.value }))}
-                          />
-                          <TextField
-                            label="Perspective" size="small" fullWidth multiline rows={3}
-                            value={editForm.perspective}
-                            onChange={e => setEditForm(f => ({ ...f, perspective: e.target.value }))}
-                          />
-
-                          {/* Biases tag editor */}
-                          <Box>
-                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block', mb: 0.75 }}>
-                              Biases
-                            </Typography>
-                            <Stack direction="row" flexWrap="wrap" sx={{ gap: 0.5, mb: 1 }}>
-                              {editForm.biases.map(b => (
-                                <Chip
-                                  key={b}
-                                  size="small"
-                                  label={b}
-                                  variant="outlined"
-                                  onDelete={() => setEditForm(f => ({ ...f, biases: f.biases.filter(x => x !== b) }))}
-                                  sx={{ height: 24, fontSize: '0.7rem', color: 'text.secondary', borderColor: 'rgba(255,255,255,0.15)' }}
-                                />
-                              ))}
+                            {/* Biases + Source side by side */}
+                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                              <Box sx={{ flex: 1 }}>
+                                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block', mb: 0.5 }}>
+                                  Known biases
+                                </Typography>
+                                <Stack direction="row" flexWrap="wrap" sx={{ gap: 0.5 }}>
+                                  {persona.biases.map(b => (
+                                    <Chip key={b} size="small" label={b} variant="outlined"
+                                      sx={{ height: 20, fontSize: '0.7rem', color: 'text.secondary', borderColor: 'rgba(255,255,255,0.12)' }} />
+                                  ))}
+                                </Stack>
+                              </Box>
+                              <Box sx={{ flex: 1 }}>
+                                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block', mb: 0.5 }}>
+                                  Source context
+                                </Typography>
+                                <Stack direction="row" flexWrap="wrap" sx={{ gap: 0.5 }}>
+                                  {persona.sourceContext.map(s => (
+                                    <Chip key={s} size="small" label={sourceLabels[s] || s}
+                                      sx={{ height: 20, fontSize: '0.7rem', bgcolor: 'rgba(255,255,255,0.06)', color: 'text.secondary' }} />
+                                  ))}
+                                </Stack>
+                              </Box>
                             </Stack>
-                            <Stack direction="row" spacing={1}>
+                          </Stack>
+                        ) : (
+                          /* ── Inline edit form ── */
+                          <Stack spacing={1.5}>
+
+                            {/* ── AI prompt box ── */}
+                            <Box sx={{
+                              p: 1.5,
+                              borderRadius: 1.5,
+                              background: 'linear-gradient(135deg, rgba(91,103,192,0.08) 0%, rgba(156,39,176,0.08) 100%)',
+                              border: '1px solid rgba(96,165,250,0.18)',
+                            }}>
+                              <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 1 }}>
+                                <Box sx={{
+                                  width: 20, height: 20, borderRadius: 0.75,
+                                  background: 'linear-gradient(135deg,#5C6BC0,#9C27B0)',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                                }}>
+                                  <AIBadgeIcon sx={{ fontSize: 11, color: 'white' }} />
+                                </Box>
+                                <Typography variant="caption" sx={{ fontWeight: 700, color: '#93c5fd' }}>
+                                  Instruct the agent
+                                </Typography>
+                                <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.65rem' }}>
+                                  Tell the agent what to change about this persona
+                                </Typography>
+                              </Stack>
+                              <Stack direction="row" spacing={1} alignItems="flex-end">
+                                <TextField
+                                  size="small"
+                                  fullWidth
+                                  multiline
+                                  minRows={2}
+                                  maxRows={4}
+                                  placeholder={`e.g. "Make this persona more focused on regulatory compliance and less on operational risk. Add a cost-conscious bias."`}
+                                  value={personaAIPrompt}
+                                  onChange={e => setPersonaAIPrompt(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter' && e.ctrlKey) handleApplyPersonaPrompt();
+                                  }}
+                                  disabled={personaAIApplying}
+                                  sx={{
+                                    '& .MuiOutlinedInput-root': {
+                                      fontSize: '0.82rem',
+                                      bgcolor: 'rgba(0,0,0,0.2)',
+                                      '& fieldset': { borderColor: 'rgba(96,165,250,0.2)' },
+                                      '&:hover fieldset': { borderColor: 'rgba(96,165,250,0.35)' },
+                                      '&.Mui-focused fieldset': { borderColor: 'rgba(96,165,250,0.5)' },
+                                    },
+                                  }}
+                                />
+                                <Button
+                                  variant="contained"
+                                  size="small"
+                                  startIcon={personaAIApplying
+                                    ? <CircularProgress size={12} sx={{ color: 'white' }} />
+                                    : <SendIcon sx={{ fontSize: '13px !important' }} />}
+                                  onClick={handleApplyPersonaPrompt}
+                                  disabled={!personaAIPrompt.trim() || personaAIApplying}
+                                  sx={{
+                                    flexShrink: 0,
+                                    background: 'linear-gradient(135deg,#5C6BC0,#9C27B0)',
+                                    '&:hover': { background: 'linear-gradient(135deg,#6d7bce,#ab47bc)' },
+                                    '&.Mui-disabled': { opacity: 0.45 },
+                                    px: 1.5, py: 0.875,
+                                    minWidth: 'auto',
+                                    fontSize: '0.78rem',
+                                    alignSelf: 'flex-end',
+                                  }}
+                                >
+                                  {personaAIApplying ? 'Applying…' : 'Apply'}
+                                </Button>
+                              </Stack>
+                              <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mt: 0.5, fontSize: '0.62rem' }}>
+                                Ctrl+Enter to apply · Agent will update the fields below — review before saving
+                              </Typography>
+                            </Box>
+
+                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
                               <TextField
-                                size="small"
-                                placeholder="Add a bias tag..."
-                                value={editForm.newBias}
-                                onChange={e => setEditForm(f => ({ ...f, newBias: e.target.value }))}
-                                onKeyDown={e => {
-                                  if (e.key === 'Enter' && editForm.newBias.trim()) {
-                                    setEditForm(f => ({ ...f, biases: [...f.biases, f.newBias.trim()], newBias: '' }));
-                                  }
-                                }}
-                                sx={{ flex: 1 }}
+                                label="Name" size="small" fullWidth
+                                value={editForm.name}
+                                onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
                               />
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                onClick={() => {
-                                  if (editForm.newBias.trim()) {
-                                    setEditForm(f => ({ ...f, biases: [...f.biases, f.newBias.trim()], newBias: '' }));
-                                  }
-                                }}
-                              >
-                                Add
+                              <TextField
+                                label="Role" size="small" fullWidth
+                                value={editForm.role}
+                                onChange={e => setEditForm(f => ({ ...f, role: e.target.value }))}
+                              />
+                            </Stack>
+                            <TextField
+                              label="Perspective" size="small" fullWidth multiline rows={3}
+                              value={editForm.perspective}
+                              onChange={e => setEditForm(f => ({ ...f, perspective: e.target.value }))}
+                            />
+
+                            {/* Biases tag editor */}
+                            <Box>
+                              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block', mb: 0.75 }}>
+                                Biases
+                              </Typography>
+                              <Stack direction="row" flexWrap="wrap" sx={{ gap: 0.5, mb: 1 }}>
+                                {editForm.biases.map(b => (
+                                  <Chip
+                                    key={b} size="small" label={b} variant="outlined"
+                                    onDelete={() => setEditForm(f => ({ ...f, biases: f.biases.filter(x => x !== b) }))}
+                                    sx={{ height: 24, fontSize: '0.7rem', color: 'text.secondary', borderColor: 'rgba(255,255,255,0.15)' }}
+                                  />
+                                ))}
+                              </Stack>
+                              <Stack direction="row" spacing={1}>
+                                <TextField
+                                  size="small"
+                                  placeholder="Add bias tag…"
+                                  value={editForm.newBias}
+                                  onChange={e => setEditForm(f => ({ ...f, newBias: e.target.value }))}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter' && editForm.newBias.trim()) {
+                                      setEditForm(f => ({ ...f, biases: [...f.biases, f.newBias.trim()], newBias: '' }));
+                                    }
+                                  }}
+                                  sx={{ flex: 1 }}
+                                />
+                                <Button size="small" variant="outlined" startIcon={<AddIcon />}
+                                  onClick={() => {
+                                    if (editForm.newBias.trim()) {
+                                      setEditForm(f => ({ ...f, biases: [...f.biases, f.newBias.trim()], newBias: '' }));
+                                    }
+                                  }}>
+                                  Add
+                                </Button>
+                              </Stack>
+                            </Box>
+
+                            {/* Save / cancel */}
+                            <Stack direction="row" spacing={1}>
+                              <Button size="small" variant="contained" startIcon={<SaveIcon />}
+                                onClick={() => handleSavePersona(persona.id)}>
+                                Save changes
+                              </Button>
+                              <Button size="small" variant="outlined" startIcon={<CloseIcon sx={{ fontSize: '13px !important' }} />}
+                                onClick={() => { setEditingPersonaId(null); setPersonaAIPrompt(''); }}>
+                                Cancel
                               </Button>
                             </Stack>
-                          </Box>
-
-                          <Stack direction="row" spacing={1}>
-                            <Button size="small" variant="contained" onClick={() => handleSavePersona(persona.id)}>
-                              Save changes
-                            </Button>
-                            <Button size="small" variant="outlined" onClick={() => setEditingPersonaId(null)}>
-                              Cancel
-                            </Button>
                           </Stack>
-                        </Stack>
+                        )}
                       </Box>
                     </Collapse>
                   </Paper>
-                </Grid>
-              ))}
-            </Grid>
+                );
+              })}
+            </Stack>
           </>
         )}
 
         {/* ═══════════════════════════════════════════════
-            TAB 2 — Existing Assessments
+            TAB 1 — Existing Assessments
         ═══════════════════════════════════════════════ */}
-        {activeTab === 2 && (() => {
+        {activeTab === 1 && (() => {
           const inProgressCount = existingAssessmentGroups.filter(g => !g.isCompleted).length;
           const completedCount = existingAssessmentGroups.filter(g => g.isCompleted).length;
           const overdueCount = existingAssessmentGroups.filter(g => g.isOverdue).length;
@@ -1166,7 +1904,16 @@ export default function AssessmentsPage() {
                         ? { label: 'Completed', bg: 'rgba(76,175,80,0.15)', color: '#4caf50', border: 'rgba(76,175,80,0.35)' }
                         : { label: 'In progress', bg: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: 'rgba(96,165,250,0.3)' };
                     const barColor = g.isOverdue ? '#f87171' : g.isCompleted ? '#34d399' : '#60a5fa';
-                    const kriIndicators = KRI_INDICATORS[g.id] || [];
+                    const kriIndicators = getKRIChipsForCategory(kris, g.id);
+                    const resultsExpanded = expandedResultGroupId === g.id;
+
+                    // Pull mock synthesis for this category (or generate from index)
+                    const mockResultIdx = RESULTS_BY_CATEGORY[g.category] ?? (Object.keys(RESULTS_BY_CATEGORY).length % MOCK_SYNTHESISED_ASSESSMENTS.length);
+                    const mockSynthesis = MOCK_SYNTHESISED_ASSESSMENTS[mockResultIdx];
+
+                    // Map each risk in the group to an assessor opinion (assessed risks get opinions, pending don't)
+                    const assessedRisks = g.risks.filter(r => r.assessmentStatus === 'assessed');
+                    const pendingRisks = g.risks.filter(r => r.assessmentStatus !== 'assessed');
 
                     return (
                       <Paper key={g.id} variant="outlined" sx={{ overflow: 'hidden' }}>
@@ -1176,36 +1923,23 @@ export default function AssessmentsPage() {
                             <Box sx={{ flex: 1, mr: 2 }}>
                               <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" gap={0.5}>
                                 <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{g.label}</Typography>
-                                <Chip
-                                  size="small"
-                                  label={statusChip.label}
-                                  sx={{ height: 20, fontSize: '0.7rem', bgcolor: statusChip.bg, color: statusChip.color, border: `1px solid ${statusChip.border}` }}
-                                />
+                                <Chip size="small" label={statusChip.label}
+                                  sx={{ height: 20, fontSize: '0.7rem', bgcolor: statusChip.bg, color: statusChip.color, border: `1px solid ${statusChip.border}` }} />
                                 {g.highSevCount > 0 && !g.isCompleted && (
-                                  <Chip
-                                    size="small"
+                                  <Chip size="small"
                                     icon={<SeverityIcon sx={{ fontSize: '11px !important', color: '#f87171 !important' }} />}
                                     label={`${g.highSevCount} high severity`}
-                                    sx={{ height: 20, fontSize: '0.7rem', bgcolor: 'rgba(248,113,113,0.1)', color: '#f87171' }}
-                                  />
+                                    sx={{ height: 20, fontSize: '0.7rem', bgcolor: 'rgba(248,113,113,0.1)', color: '#f87171' }} />
                                 )}
-                                {/* KRI chips */}
                                 {kriIndicators.map((kri, ki) => (
-                                  <Chip
-                                    key={ki}
-                                    size="small"
+                                  <Chip key={ki} size="small"
                                     label={`● ${kri.count} ${kri.status} KRI${kri.count > 1 ? 's' : ''}`}
-                                    sx={{
-                                      height: 20, fontSize: '0.7rem', fontWeight: 600,
+                                    sx={{ height: 20, fontSize: '0.7rem', fontWeight: 600,
                                       bgcolor: kri.status === 'red' ? 'rgba(244,67,54,0.1)' : 'rgba(255,152,0,0.1)',
-                                      color: kri.status === 'red' ? '#f44336' : '#ff9800',
-                                    }}
-                                  />
+                                      color: kri.status === 'red' ? '#f44336' : '#ff9800' }} />
                                 ))}
                               </Stack>
-                              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
-                                {g.description}
-                              </Typography>
+                              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>{g.description}</Typography>
                             </Box>
                             <Typography variant="caption" color="text.disabled" sx={{ flexShrink: 0, mt: 0.25 }}>
                               {g.daysSinceStart === 0 ? 'Started today' : `Started ${g.daysSinceStart}d ago`}
@@ -1220,29 +1954,18 @@ export default function AssessmentsPage() {
                                 {g.assessed} of {g.total} risks assessed · {g.progress}%
                               </Typography>
                             </Stack>
-                            <LinearProgress
-                              variant="determinate"
-                              value={g.progress}
-                              sx={{
-                                height: 5, borderRadius: 3,
-                                bgcolor: 'rgba(255,255,255,0.06)',
-                                '& .MuiLinearProgress-bar': { bgcolor: barColor, borderRadius: 3 },
-                              }}
-                            />
+                            <LinearProgress variant="determinate" value={g.progress}
+                              sx={{ height: 5, borderRadius: 3, bgcolor: 'rgba(255,255,255,0.06)',
+                                '& .MuiLinearProgress-bar': { bgcolor: barColor, borderRadius: 3 } }} />
                           </Box>
 
-                          <Divider sx={{ borderColor: 'rgba(96,165,250,0.07)', mb: 2 }} />
-
-                          {/* Footer row */}
+                          {/* Assessors + footer row */}
                           <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
                             <Stack direction="row" spacing={1} alignItems="center">
-                              <AvatarGroup
-                                max={4}
-                                sx={{
-                                  '& .MuiAvatar-root': { width: 28, height: 28, fontSize: '0.7rem', fontWeight: 700, border: '2px solid rgba(14,20,35,0.8)' },
-                                  '& .MuiAvatarGroup-avatar': { bgcolor: 'rgba(96,165,250,0.2)', color: 'primary.light', fontSize: '0.75rem' },
-                                }}
-                              >
+                              <AvatarGroup max={4} sx={{
+                                '& .MuiAvatar-root': { width: 26, height: 26, fontSize: '0.65rem', fontWeight: 700, border: '2px solid rgba(14,20,35,0.8)' },
+                                '& .MuiAvatarGroup-avatar': { bgcolor: 'rgba(96,165,250,0.2)', color: 'primary.light' },
+                              }}>
                                 {g.assessors.map(a => (
                                   <Tooltip key={a.name} title={`${a.name} · ${a.role}`} arrow>
                                     <Avatar sx={{ bgcolor: ownerColors[a.name] || '#6B7280' }}>
@@ -1254,22 +1977,251 @@ export default function AssessmentsPage() {
                               <Typography variant="caption" color="text.secondary">
                                 {g.assessors.length} assessor{g.assessors.length !== 1 ? 's' : ''}
                               </Typography>
+                              {mockSynthesis.opinions.filter(o => o.assessorType === 'ai_persona').length > 0 && (
+                                <Chip size="small"
+                                  icon={<AIBadgeIcon sx={{ fontSize: '10px !important' }} />}
+                                  label={`${mockSynthesis.opinions.filter(o => o.assessorType === 'ai_persona').length} AI`}
+                                  sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'rgba(96,165,250,0.08)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.2)', '& .MuiChip-icon': { ml: 0.5 } }} />
+                              )}
                             </Stack>
                             <Stack direction="row" spacing={1}>
-                              {g.isCompleted ? (
-                                <>
-                                  <Button size="small" variant="text">Archive</Button>
-                                  <Button size="small" variant="outlined" endIcon={<ArrowIcon />}>Review results</Button>
-                                </>
-                              ) : (
-                                <>
-                                  <Button size="small" variant="text">View risks</Button>
-                                  <Button size="small" variant="contained" endIcon={<ArrowIcon />}>Continue</Button>
-                                </>
+                              <Button size="small" variant="outlined"
+                                startIcon={<ExpandMoreIcon sx={{ fontSize: '14px !important', transform: resultsExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />}
+                                onClick={() => setExpandedResultGroupId(resultsExpanded ? null : g.id)}>
+                                {resultsExpanded ? 'Hide results' : `View results (${assessedRisks.length + pendingRisks.length})`}
+                              </Button>
+                              {!g.isCompleted && (
+                                <Button size="small" variant="contained" startIcon={<ArrowIcon />}
+                                  onClick={() => setDetailGroup({ id: g.id, label: g.label, description: g.description, risks: g.risks, source: 'In progress', urgency: 'high', recType: 'priority' })}>
+                                  Continue
+                                </Button>
                               )}
                             </Stack>
                           </Stack>
                         </Box>
+
+                        {/* ─── Results panel ─────────────────────────────────── */}
+                        <Collapse in={resultsExpanded} timeout="auto" unmountOnExit>
+                          <Divider />
+                          <Box sx={{ bgcolor: 'rgba(0,0,0,0.2)' }}>
+
+                            {/* Synthesized score header */}
+                            {assessedRisks.length > 0 && (
+                              <Box sx={{ px: 2.5, py: 1.75, borderBottom: '1px solid rgba(255,255,255,0.06)', bgcolor: 'rgba(96,165,250,0.04)' }}>
+                                <Stack direction="row" alignItems="center" spacing={2} flexWrap="wrap" gap={1}>
+                                  <Stack direction="row" spacing={0.75} alignItems="center">
+                                    <VerifiedIcon sx={{ fontSize: 14, color: CONF_COLOR[mockSynthesis.confidenceLevel] }} />
+                                    <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>Synthesized score</Typography>
+                                  </Stack>
+                                  <Stack direction="row" spacing={0.5} alignItems="center">
+                                    <Typography variant="body2" sx={{ fontWeight: 700, color: SCORE_COLOR[Math.round(mockSynthesis.synthesisedLikelihood)] }}>
+                                      L {mockSynthesis.synthesisedLikelihood.toFixed(1)}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.disabled">×</Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 700, color: SCORE_COLOR[Math.round(mockSynthesis.synthesisedImpact)] }}>
+                                      I {mockSynthesis.synthesisedImpact.toFixed(1)}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.disabled">=</Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 700, color: SCORE_COLOR[Math.round((mockSynthesis.synthesisedLikelihood + mockSynthesis.synthesisedImpact) / 2)] }}>
+                                      {((mockSynthesis.synthesisedLikelihood + mockSynthesis.synthesisedImpact) / 2).toFixed(1)}
+                                    </Typography>
+                                  </Stack>
+                                  <Chip size="small" label={`${mockSynthesis.confidenceLevel} confidence`}
+                                    sx={{ height: 18, fontSize: '0.65rem', fontWeight: 600,
+                                      bgcolor: `${CONF_COLOR[mockSynthesis.confidenceLevel]}18`,
+                                      color: CONF_COLOR[mockSynthesis.confidenceLevel],
+                                      border: `1px solid ${CONF_COLOR[mockSynthesis.confidenceLevel]}40` }} />
+                                  {mockSynthesis.outlierFlags.length > 0 && (
+                                    <Chip size="small"
+                                      icon={<OutlierIcon sx={{ fontSize: '10px !important' }} />}
+                                      label={`${mockSynthesis.outlierFlags.length} outlier${mockSynthesis.outlierFlags.length > 1 ? 's' : ''} flagged`}
+                                      sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'rgba(251,191,36,0.1)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)', '& .MuiChip-icon': { ml: 0.5 } }} />
+                                  )}
+                                  <Stack direction="row" spacing={0.5} alignItems="center" sx={{ ml: 'auto !important' }}>
+                                    <DeltaIcon sx={{ fontSize: 12, color: 'text.disabled' }} />
+                                    <Typography variant="caption" color="text.disabled">{mockSynthesis.whatChangedSinceLastTime}</Typography>
+                                  </Stack>
+                                </Stack>
+                                {mockSynthesis.anomalyNotes.length > 0 && (
+                                  <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 1 }}>
+                                    <OutlierIcon sx={{ fontSize: 13, color: '#fbbf24', flexShrink: 0 }} />
+                                    <Typography variant="caption" sx={{ color: '#fbbf24', lineHeight: 1.5 }}>
+                                      {mockSynthesis.anomalyNotes[0]}
+                                    </Typography>
+                                  </Stack>
+                                )}
+                              </Box>
+                            )}
+
+                            {/* Per-risk results */}
+                            {g.risks.map((risk, rIdx) => {
+                              const isAssessed = risk.assessmentStatus === 'assessed';
+                              const riskResultOpen = expandedRiskResultId === risk.id;
+                              // Rotate through opinions from mock data based on risk index
+                              const opinions = mockSynthesis.opinions.map((op, opIdx) => ({
+                                ...op,
+                                likelihood: Math.max(1, Math.min(5, Math.round(op.likelihood + (rIdx * 0.3 - 0.15)))) as 1|2|3|4|5,
+                                impact: Math.max(1, Math.min(5, Math.round(op.impact + (rIdx * 0.2 - 0.1)))) as 1|2|3|4|5,
+                              }));
+
+                              return (
+                                <Box key={risk.id} sx={{ borderBottom: rIdx < g.risks.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                                  {/* Risk header row */}
+                                  <Stack
+                                    direction="row"
+                                    alignItems="center"
+                                    spacing={1.5}
+                                    sx={{
+                                      px: 2.5, py: 1.25,
+                                      cursor: isAssessed ? 'pointer' : 'default',
+                                      '&:hover': isAssessed ? { bgcolor: 'rgba(255,255,255,0.025)' } : {},
+                                    }}
+                                    onClick={() => isAssessed && setExpandedRiskResultId(riskResultOpen ? null : risk.id)}
+                                  >
+                                    <Box sx={{
+                                      width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                                      bgcolor: isAssessed ? '#4ade80' : '#64748b',
+                                    }} />
+                                    <Typography variant="body2" sx={{ flex: 1, fontWeight: isAssessed ? 600 : 400, color: isAssessed ? 'text.primary' : 'text.secondary' }}>
+                                      {risk.title}
+                                    </Typography>
+                                    <Chip size="small"
+                                      label={isAssessed ? 'Assessed' : risk.assessmentStatus === 'in_progress' ? 'In progress' : 'Pending'}
+                                      sx={{
+                                        height: 18, fontSize: '0.65rem', flexShrink: 0,
+                                        bgcolor: isAssessed ? 'rgba(74,222,128,0.1)' : risk.assessmentStatus === 'in_progress' ? 'rgba(96,165,250,0.1)' : 'rgba(100,116,139,0.1)',
+                                        color: isAssessed ? '#4ade80' : risk.assessmentStatus === 'in_progress' ? '#60a5fa' : '#64748b',
+                                      }} />
+                                    {isAssessed && (
+                                      <ExpandMoreIcon sx={{ fontSize: 16, color: 'text.disabled', flexShrink: 0, transform: riskResultOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                                    )}
+                                  </Stack>
+
+                                  {/* Assessor opinions for this risk */}
+                                  <Collapse in={riskResultOpen} timeout="auto" unmountOnExit>
+                                    <Box sx={{ px: 2.5, pb: 1.5 }}>
+                                      {/* Opinion table */}
+                                      <Stack spacing={0.75} sx={{ mb: 1.5 }}>
+                                        {opinions.map((op, opIdx) => {
+                                          const isAI = op.assessorType === 'ai_persona';
+                                          const score = Math.round((op.likelihood + op.impact) / 2);
+                                          const isOutlier = mockSynthesis.outlierFlags.includes(op.assessorId);
+                                          return (
+                                            <Box key={op.assessorId} sx={{
+                                              p: 1.5,
+                                              borderRadius: 1.5,
+                                              bgcolor: isAI ? 'rgba(96,165,250,0.04)' : 'rgba(255,255,255,0.03)',
+                                              border: isOutlier
+                                                ? '1px solid rgba(251,191,36,0.25)'
+                                                : `1px solid ${isAI ? 'rgba(96,165,250,0.12)' : 'rgba(255,255,255,0.07)'}`,
+                                            }}>
+                                              <Stack direction="row" alignItems="flex-start" spacing={1.5}>
+                                                {/* Avatar + name */}
+                                                <Stack direction="row" spacing={0.75} alignItems="center" sx={{ minWidth: 160, flexShrink: 0 }}>
+                                                  <Avatar sx={{ width: 24, height: 24, fontSize: '0.6rem', bgcolor: isAI ? '#1e3a5f' : ownerColors[op.assessorName] || '#374151' }}>
+                                                    {isAI ? '✦' : op.assessorName.split(' ').map(n => n[0]).join('')}
+                                                  </Avatar>
+                                                  <Box>
+                                                    <Stack direction="row" spacing={0.5} alignItems="center">
+                                                      <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '0.75rem', lineHeight: 1.2 }}>
+                                                        {op.assessorName.replace(' Persona', '')}
+                                                      </Typography>
+                                                      {isOutlier && (
+                                                        <Tooltip title="Outlier — score diverges from consensus" arrow>
+                                                          <OutlierIcon sx={{ fontSize: 11, color: '#fbbf24' }} />
+                                                        </Tooltip>
+                                                      )}
+                                                    </Stack>
+                                                    <Stack direction="row" spacing={0.4} alignItems="center">
+                                                      {isAI && <AIBadgeIcon sx={{ fontSize: 9, color: '#60a5fa' }} />}
+                                                      <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.65rem' }}>
+                                                        {isAI ? 'AI assessor' : 'Human assessor'}
+                                                      </Typography>
+                                                    </Stack>
+                                                  </Box>
+                                                </Stack>
+
+                                                {/* Scores */}
+                                                <Stack spacing={0.5} sx={{ minWidth: 160, flexShrink: 0 }}>
+                                                  {[{ label: 'Likelihood', value: op.likelihood }, { label: 'Impact', value: op.impact }].map(s => (
+                                                    <Stack key={s.label} direction="row" alignItems="center" spacing={0.75}>
+                                                      <Typography variant="caption" color="text.disabled" sx={{ width: 60, fontSize: '0.65rem' }}>{s.label}</Typography>
+                                                      <Box sx={{ flex: 1, height: 5, borderRadius: 3, bgcolor: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+                                                        <Box sx={{ width: `${(s.value / 5) * 100}%`, height: '100%', bgcolor: SCORE_COLOR[s.value], borderRadius: 3 }} />
+                                                      </Box>
+                                                      <Typography variant="caption" sx={{ fontWeight: 700, color: SCORE_COLOR[s.value], minWidth: 10, fontSize: '0.72rem' }}>
+                                                        {s.value}
+                                                      </Typography>
+                                                      <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.65rem', minWidth: 46 }}>
+                                                        {SCORE_LABEL[s.value]}
+                                                      </Typography>
+                                                    </Stack>
+                                                  ))}
+                                                </Stack>
+
+                                                {/* Score + confidence */}
+                                                <Stack spacing={0.25} sx={{ minWidth: 64, flexShrink: 0 }}>
+                                                  <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.65rem' }}>Score</Typography>
+                                                  <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1, color: SCORE_COLOR[score] }}>{score}</Typography>
+                                                  <Chip size="small" label={op.confidence}
+                                                    sx={{ height: 15, fontSize: '0.58rem', bgcolor: `${CONF_COLOR[op.confidence]}18`, color: CONF_COLOR[op.confidence], border: `1px solid ${CONF_COLOR[op.confidence]}40`, '& .MuiChip-label': { px: 0.75 } }} />
+                                                </Stack>
+
+                                                {/* Rationale */}
+                                                <Typography variant="caption" color="text.secondary" sx={{ flex: 1, lineHeight: 1.6, fontSize: '0.78rem', minWidth: 0 }}>
+                                                  {op.rationale}
+                                                </Typography>
+                                              </Stack>
+                                            </Box>
+                                          );
+                                        })}
+                                      </Stack>
+
+                                      {/* Benchmark + what changed */}
+                                      {mockSynthesis.benchmarkComparison && (
+                                        <Stack direction="row" spacing={0.75} alignItems="flex-start"
+                                          sx={{ px: 1.25, py: 0.875, borderRadius: 1.25, bgcolor: 'rgba(96,165,250,0.05)', border: '1px solid rgba(96,165,250,0.12)', mb: 1 }}>
+                                          <InfoIcon sx={{ fontSize: 13, color: '#60a5fa', mt: 0.1, flexShrink: 0 }} />
+                                          <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.5 }}>
+                                            {mockSynthesis.benchmarkComparison}
+                                          </Typography>
+                                        </Stack>
+                                      )}
+
+                                      {mockSynthesis.uncertainties.length > 0 && (
+                                        <Stack spacing={0.25}>
+                                          <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.disabled', fontSize: '0.65rem' }}>Open uncertainties</Typography>
+                                          {mockSynthesis.uncertainties.map((u, ui) => (
+                                            <Stack key={ui} direction="row" spacing={0.5} alignItems="flex-start">
+                                              <Typography variant="caption" color="text.disabled">·</Typography>
+                                              <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.5 }}>{u}</Typography>
+                                            </Stack>
+                                          ))}
+                                        </Stack>
+                                      )}
+                                    </Box>
+                                  </Collapse>
+                                </Box>
+                              );
+                            })}
+
+                            {/* Past assessment note for completed groups */}
+                            {g.isCompleted && (
+                              <Box sx={{ px: 2.5, py: 1.5, bgcolor: 'rgba(74,222,128,0.04)', borderTop: '1px solid rgba(74,222,128,0.12)' }}>
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                  <VerifiedIcon sx={{ fontSize: 14, color: '#4ade80' }} />
+                                  <Typography variant="caption" sx={{ color: '#4ade80', fontWeight: 600 }}>Assessment completed</Typography>
+                                  <Typography variant="caption" color="text.disabled">·</Typography>
+                                  <Typography variant="caption" color="text.disabled">
+                                    All {g.total} risks assessed · Final score: {((mockSynthesis.synthesisedLikelihood + mockSynthesis.synthesisedImpact) / 2).toFixed(1)} avg
+                                  </Typography>
+                                  <Box sx={{ flex: 1 }} />
+                                  <Button size="small" variant="text" sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>Archive</Button>
+                                </Stack>
+                              </Box>
+                            )}
+                          </Box>
+                        </Collapse>
                       </Paper>
                     );
                   })}
@@ -1316,7 +2268,7 @@ export default function AssessmentsPage() {
           <Box sx={{ height: '100%', overflowY: 'auto', pb: 4 }}>
             {/* Drawer header */}
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>Review Assessment Draft</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>Review assessment draft</Typography>
               <IconButton size="small" onClick={() => setDraftRisk(null)}><CloseIcon /></IconButton>
             </Stack>
 
@@ -1412,13 +2364,13 @@ export default function AssessmentsPage() {
             <TableContainer component={Paper} variant="outlined" sx={{ mb: 2, bgcolor: 'rgba(255,255,255,0.02)' }}>
               <Table size="small">
                 <TableHead>
-                  <TableRow sx={{ bgcolor: 'rgba(13,17,23,0.5)' }}>
-                    <TableCell sx={{ fontWeight: 700 }}>ASSESSOR</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>TYPE</TableCell>
-                    <TableCell sx={{ fontWeight: 700, width: 40, textAlign: 'center' }}>L</TableCell>
-                    <TableCell sx={{ fontWeight: 700, width: 40, textAlign: 'center' }}>I</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>CONFIDENCE</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>RATIONALE</TableCell>
+                  <TableRow>
+                    <TableCell>Assessor</TableCell>
+                    <TableCell>Type</TableCell>
+                    <TableCell sx={{ width: 40, textAlign: 'center' }}>L</TableCell>
+                    <TableCell sx={{ width: 40, textAlign: 'center' }}>I</TableCell>
+                    <TableCell>Confidence</TableCell>
+                    <TableCell>Rationale</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -1583,6 +2535,7 @@ export default function AssessmentsPage() {
             <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ gap: 1 }}>
               <Button
                 variant="contained"
+                startIcon={<CheckIcon />}
                 onClick={() => { setSnackMessage('Assessment approved'); setDraftRisk(null); }}
               >
                 Approve synthesised result
@@ -1614,7 +2567,7 @@ export default function AssessmentsPage() {
       >
         <DialogTitle>
           <Stack direction="row" justifyContent="space-between" alignItems="center">
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>Add Persona Manually</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>Add persona manually</Typography>
             <IconButton size="small" onClick={() => setAddDialogOpen(false)}><CloseIcon /></IconButton>
           </Stack>
         </DialogTitle>
@@ -1653,10 +2606,11 @@ export default function AssessmentsPage() {
           <Button onClick={() => setAddDialogOpen(false)}>Cancel</Button>
           <Button
             variant="contained"
+            startIcon={<AddIcon />}
             onClick={handleAddPersona}
             disabled={!newPersonaForm.name || !newPersonaForm.role}
           >
-            Add Persona
+            Add persona
           </Button>
         </DialogActions>
       </Dialog>

@@ -254,6 +254,11 @@ const theme = createTheme({
           '& .MuiTableCell-root': {
             background: 'rgba(13, 17, 23, 0.6)',
             borderBottom: '1px solid rgba(96, 165, 250, 0.15)',
+            fontSize: '0.75rem',
+            fontWeight: 600,
+            color: '#94a3b8',
+            paddingTop: 10,
+            paddingBottom: 10,
           },
         },
       },

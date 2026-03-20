@@ -59,8 +59,8 @@ import {
   AccountBalance as AccountBalanceIcon,
   MergeType as MergeIcon,
   ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
   Send as SendIcon,
+  Save as SaveIcon,
 } from '@mui/icons-material';
 import Link from 'next/link';
 import { DocumentUpload } from '@/components/agent/DocumentUpload';
@@ -403,9 +403,10 @@ function AddRiskSideSheet({ open, onClose, onSave }: AddRiskSideSheetProps) {
         <Button variant="outlined" onClick={handleClose} fullWidth>
           Cancel
         </Button>
-        <Button 
-          variant="contained" 
-          onClick={handleSave} 
+        <Button
+          variant="contained"
+          startIcon={<SaveIcon />}
+          onClick={handleSave}
           fullWidth
           disabled={!name.trim()}
         >
@@ -476,12 +477,86 @@ function isDuplicate(title: string): boolean {
   return DUPLICATE_KEYWORDS.some(kw => lower.includes(kw));
 }
 
-function getConfidence(sources: DataSource[]): { label: string; color: 'success' | 'warning' | 'default' } {
-  const hasHighRelevance = sources.some(s => s.relevance === 'high');
-  const mediumCount = sources.filter(s => s.relevance === 'medium').length;
-  if (sources.length >= 2 && hasHighRelevance) return { label: 'High', color: 'success' };
-  if (sources.length >= 1 && (hasHighRelevance || mediumCount >= 2)) return { label: 'Medium', color: 'warning' };
-  return { label: 'Low', color: 'default' };
+interface ConfidenceResult {
+  pct: number;
+  gaps: string[];
+}
+
+function getConfidence(risk: RiskSuggestion): ConfidenceResult {
+  const { sources, description, suggestedOwner, category, title, id } = risk;
+
+  // Weighted rules across identification, compliance and regulatory domains.
+  // Weights are deliberately unequal so combined scores are non-round.
+  const rules: { pass: boolean; weight: number; failReason: string }[] = [
+    // ── Identification quality ──────────────────────────────────────────
+    {
+      pass: sources.length >= 2, weight: 9,
+      failReason: 'Single-source identification — cross-source corroboration could not be established',
+    },
+    {
+      pass: sources.some(s => s.relevance === 'high'), weight: 8,
+      failReason: 'No high-relevance source — all contributing sources rated medium or low relevance',
+    },
+    {
+      pass: !!suggestedOwner, weight: 7,
+      failReason: 'Risk owner could not be inferred from source material',
+    },
+    {
+      pass: description.length >= 60, weight: 6,
+      failReason: 'Thin description — insufficient detail extracted to fully characterise the risk',
+    },
+    {
+      pass: title.split(' ').length >= 4, weight: 5,
+      failReason: 'Risk title is too brief to meet naming convention standards (≥4 words required)',
+    },
+    // ── Compliance alignment ────────────────────────────────────────────
+    {
+      pass: ['compliance', 'financial', 'cyber'].includes(category), weight: 9,
+      failReason: 'Risk category not directly mapped to a recognised regulatory framework (e.g. SOX, GDPR, DORA)',
+    },
+    {
+      pass: /regulat|complian|control|obligat|legislat/i.test(description), weight: 8,
+      failReason: 'No explicit reference to controls or compliance obligations found in the extracted description',
+    },
+    {
+      pass: category !== 'operational', weight: 7,
+      failReason: 'Category defaulted to operational — source did not signal a more specific regulatory domain',
+    },
+    // ── Regulatory grounding ────────────────────────────────────────────
+    {
+      pass: sources.some(s => ['10k_filing', 'trend', 'competitor'].includes(s?.type ?? '')), weight: 8,
+      failReason: 'No external regulatory or market-trend source cited — jurisdictional grounding is weak',
+    },
+    {
+      pass: sources.every(s => s.relevance !== 'low'), weight: 6,
+      failReason: 'One or more contributing sources has low relevance — precision may be reduced',
+    },
+    {
+      pass: sources.some(s => s.type === 'document'), weight: 7,
+      failReason: 'No internal document cited — risk lacks first-party evidential basis required for audit trail',
+    },
+  ];
+
+  const maxWeight = rules.reduce((sum, r) => sum + r.weight, 0);
+  const earnedWeight = rules.filter(r => r.pass).reduce((sum, r) => sum + r.weight, 0);
+
+  // Perfect compliance → 100%. Partial: scale to 11–83 with per-risk noise so
+  // values are irregular and never end cleanly on a round number.
+  const allPassed = earnedWeight === maxWeight;
+  let pct: number;
+  if (allPassed) {
+    pct = 100;
+  } else {
+    const raw = (earnedWeight / maxWeight) * 72 + 11;
+    const hash = id.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+    const noise = (hash % 7) - 3;
+    pct = Math.min(83, Math.max(11, Math.round(raw + noise)));
+  }
+
+  return {
+    pct,
+    gaps: rules.filter(r => !r.pass).map(r => r.failReason),
+  };
 }
 
 function RiskDiscoveryContent() {
@@ -510,14 +585,11 @@ function RiskDiscoveryContent() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilters, setActiveFilters] = useState<Record<string, string | string[]>>({});
   const tableRef = useRef<HTMLDivElement>(null);
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(['risk', 'category', 'score', 'owner', 'sources', 'status', 'actions']);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(['risk', 'category', 'score', 'owner', 'sources', 'actions']);
   const [filterNewRisks, setFilterNewRisks] = useState(false);
   const [sourcesDrawerOpen, setSourcesDrawerOpen] = useState(false);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
-  const [surveysExpanded, setSurveysExpanded] = useState(true);
-  const [externalIntelExpanded, setExternalIntelExpanded] = useState(true);
-  const [dismissedSurveys, setDismissedSurveys] = useState<Set<number>>(new Set());
-
+  const [externalIntelExpanded, setExternalIntelExpanded] = useState(false);
   // Single source of truth for external source groups (used by section cards and table filter)
   const externalSourceGroups = [
     { key: 'competitor' as const, types: ['competitor'] as const },
@@ -551,15 +623,6 @@ function RiskDiscoveryContent() {
       type: 'multiselect' as const,
       options: scoreOptions.map(s => ({ value: String(s.value), label: s.label })),
     },
-    {
-      id: 'status',
-      label: 'Status',
-      type: 'select' as const,
-      options: [
-        { value: 'draft', label: 'Draft' },
-        { value: 'approved', label: 'Approved' },
-      ],
-    },
   ];
   
   const columnOptions = [
@@ -568,7 +631,6 @@ function RiskDiscoveryContent() {
     { id: 'score', label: 'Inherent score' },
     { id: 'owner', label: 'Owner' },
     { id: 'sources', label: 'Sources' },
-    { id: 'status', label: 'Status' },
   ];
   
   const handleFilterChange = (filterId: string, value: string | string[]) => {
@@ -1057,32 +1119,117 @@ function RiskDiscoveryContent() {
             <RiskSummaryStats suggestions={suggestions} approvedCount={approvedCount} />
 
             {/* External Intelligence Section */}
-            <Box sx={{ mt: 2.5, mb: 1 }}>
+            {(() => {
+              const nonDup = suggestions.filter(r => !isDuplicate(r.title));
+              const srcCounts = {
+                competitor: nonDup.filter(r => r.sources?.some(s => s?.type === 'competitor')).length,
+                news:       nonDup.filter(r => r.sources?.some(s => s?.type === 'news')).length,
+                regulatory: nonDup.filter(r => r.sources?.some(s => ['10k_filing', 'trend'].includes(s?.type ?? ''))).length,
+              };
+              const totalExternal = srcCounts.competitor + srcCounts.news + srcCounts.regulatory;
+
+              const filterAndScroll = (sourceValue: string) => {
+                setActiveFilters(prev => ({ ...prev, source: sourceValue }));
+                setTimeout(() => tableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+              };
+
+              const sourcePills = [
+                {
+                  key: 'external_competitor',
+                  label: 'Competitor',
+                  count: srcCounts.competitor,
+                  icon: <CompetitorIcon sx={{ fontSize: '13px !important' }} />,
+                  color: '#C29A1D',
+                  bg: 'rgba(194,154,29,0.10)',
+                  border: 'rgba(194,154,29,0.3)',
+                },
+                {
+                  key: 'external_news',
+                  label: 'News',
+                  count: srcCounts.news,
+                  icon: <NewsIcon sx={{ fontSize: '13px !important' }} />,
+                  color: '#60a5fa',
+                  bg: 'rgba(0,96,199,0.10)',
+                  border: 'rgba(0,96,199,0.3)',
+                },
+                {
+                  key: 'external_regulatory',
+                  label: 'Regulatory',
+                  count: srcCounts.regulatory,
+                  icon: <RegulatoryIcon sx={{ fontSize: '13px !important' }} />,
+                  color: '#c084fc',
+                  bg: 'rgba(149,48,220,0.10)',
+                  border: 'rgba(149,48,220,0.3)',
+                },
+              ];
+
+              return (
+            <Paper variant="outlined" sx={{ mt: 2.5, mb: 1, overflow: 'hidden' }}>
+              {/* Card header — always visible, full row is clickable */}
               <Stack
                 direction="row"
                 alignItems="center"
-                spacing={1}
+                spacing={1.5}
                 onClick={() => setExternalIntelExpanded(prev => !prev)}
-                sx={{ cursor: 'pointer', mb: 1.5, userSelect: 'none' }}
+                sx={{ px: 2, py: 1.5, cursor: 'pointer', userSelect: 'none' }}
               >
-                <Typography variant="h6" component="h3" sx={{ fontWeight: 600 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
                   External intelligence
                 </Typography>
-                <Chip
-                  size="small"
-                  label={`${Object.values(MOCK_SIGNALS).flat().length} signals`}
-                  sx={{ height: 20, fontSize: '0.75rem' }}
+
+                {/* Collapsed summary — shown inline when closed */}
+                {!externalIntelExpanded && (
+                  <>
+                    <Divider orientation="vertical" flexItem />
+                    <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+                      {totalExternal} suggestion{totalExternal !== 1 ? 's' : ''} from outside sources
+                    </Typography>
+                    <Stack direction="row" spacing={0.75} onClick={(e) => e.stopPropagation()}>
+                      {sourcePills.map(p => (
+                        <Tooltip key={p.key} title={`Filter table by ${p.label.toLowerCase()} sources`} placement="top">
+                          <Chip
+                            size="small"
+                            icon={p.icon}
+                            label={`${p.label} · ${p.count}`}
+                            onClick={() => filterAndScroll(p.key)}
+                            sx={{
+                              height: 22,
+                              fontSize: '0.72rem',
+                              cursor: 'pointer',
+                              bgcolor: p.bg,
+                              color: p.color,
+                              border: `1px solid ${p.border}`,
+                              '& .MuiChip-icon': { color: p.color },
+                              '&:hover': { opacity: 0.85, borderColor: p.color },
+                            }}
+                          />
+                        </Tooltip>
+                      ))}
+                    </Stack>
+                  </>
+                )}
+
+                {externalIntelExpanded && (
+                  <Typography variant="caption" color="text.secondary">
+                    Sources that drove agent risk identification
+                  </Typography>
+                )}
+
+                {/* Rightmost: rotating chevron */}
+                <ExpandMoreIcon
+                  sx={{
+                    ml: 'auto !important',
+                    fontSize: 18,
+                    color: 'text.secondary',
+                    transition: 'transform 0.2s',
+                    transform: externalIntelExpanded ? 'rotate(180deg)' : 'none',
+                  }}
                 />
-                {externalIntelExpanded
-                  ? <ExpandLessIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
-                  : <ExpandMoreIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
-                }
-                <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto !important' }}>
-                  Sources that drove agent risk identification
-                </Typography>
               </Stack>
 
               <Collapse in={externalIntelExpanded}>
+                <Divider />
+                <Box sx={{ p: 2 }}>
                 <Grid container spacing={2}>
                   {/* Competitor Intelligence */}
                   <Grid size={{ xs: 12, md: 4 }}>
@@ -1312,8 +1459,11 @@ function RiskDiscoveryContent() {
                     </Paper>
                   </Grid>
                 </Grid>
+                </Box>
               </Collapse>
-            </Box>
+            </Paper>
+              );
+            })()}
 
             {/* Risk Suggestions Section */}
             <Box ref={tableRef}>
@@ -1373,13 +1523,11 @@ function RiskDiscoveryContent() {
                 <TableHead>
                   <TableRow>
                     {visibleColumns.includes('risk') && <TableCell>Risk</TableCell>}
-                    <TableCell sx={{ width: 44, color: 'text.secondary' }}>Source</TableCell>
-                    <TableCell sx={{ color: 'text.secondary' }}>Confidence</TableCell>
+                    <TableCell>Confidence</TableCell>
                     {visibleColumns.includes('category') && <TableCell>Category</TableCell>}
                     {visibleColumns.includes('score') && <TableCell>Inherent score</TableCell>}
                     {visibleColumns.includes('owner') && <TableCell>Owner</TableCell>}
                     {visibleColumns.includes('sources') && <TableCell>Sources</TableCell>}
-                    {visibleColumns.includes('status') && <TableCell>Status</TableCell>}
                     {visibleColumns.includes('actions') && <TableCell width={80} align="right">Actions</TableCell>}
                   </TableRow>
                 </TableHead>
@@ -1455,7 +1603,6 @@ function RiskDiscoveryContent() {
                               <Skeleton variant="text" width="80%" height={24} />
                             </TableCell>
                           )}
-                          <TableCell><Skeleton variant="circular" width={20} height={20} /></TableCell>
                           <TableCell><Skeleton variant="rounded" width={60} height={20} /></TableCell>
                           <TableCell><Skeleton variant="rounded" width={60} height={20} /></TableCell>
                           {visibleColumns.includes('category') && (
@@ -1487,11 +1634,6 @@ function RiskDiscoveryContent() {
                               </Stack>
                             </TableCell>
                           )}
-                          {visibleColumns.includes('status') && (
-                            <TableCell>
-                              <Skeleton variant="rounded" width={50} height={22} />
-                            </TableCell>
-                          )}
                           {visibleColumns.includes('actions') && (
                             <TableCell align="right">
                               <Stack direction="row" spacing={0.5} justifyContent="flex-end">
@@ -1506,7 +1648,7 @@ function RiskDiscoveryContent() {
                     
                     const isExpanded = expandedRow === risk.id;
                     const sourceType = risk.sources[0]?.type;
-                    const confidence = getConfidence(risk.sources);
+                    const confidence = getConfidence(risk);
                     const duplicate = isDuplicate(risk.title);
 
                     const sourceIcon = (() => {
@@ -1590,15 +1732,52 @@ function RiskDiscoveryContent() {
                               )}
                             </TableCell>
                           )}
-                          <TableCell sx={{ width: 44 }}>{sourceIcon}</TableCell>
                           <TableCell>
-                            <Chip
-                              size="small"
-                              label={confidence.label}
-                              variant="outlined"
-                              color={confidence.color}
-                              sx={{ height: 20, fontSize: '0.75rem' }}
-                            />
+                            <Tooltip
+                              arrow
+                              placement="top"
+                              title={
+                                  confidence.gaps.length === 0 ? (
+                                  <Typography variant="caption">All identification, compliance and regulatory rules met</Typography>
+                                ) : (
+                                  <Box sx={{ maxWidth: 300 }}>
+                                    <Typography variant="caption" sx={{ fontWeight: 700, display: 'block', mb: 0.75 }}>
+                                      {confidence.gaps.length} rule{confidence.gaps.length > 1 ? 's' : ''} not fully met
+                                    </Typography>
+                                    <Stack spacing={0.5}>
+                                      {confidence.gaps.map((g, gi) => (
+                                        <Typography key={gi} variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.4 }}>
+                                          · {g}
+                                        </Typography>
+                                      ))}
+                                    </Stack>
+                                  </Box>
+                                )
+                              }
+                              componentsProps={{
+                                tooltip: {
+                                  sx: {
+                                    bgcolor: 'rgba(14,22,38,0.97)',
+                                    border: '1px solid rgba(96,165,250,0.12)',
+                                    backdropFilter: 'blur(12px)',
+                                    p: 1.5,
+                                  },
+                                },
+                                arrow: { sx: { color: 'rgba(14,22,38,0.97)' } },
+                              }}
+                            >
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 700,
+                                  cursor: 'help',
+                                  color: confidence.pct >= 80 ? '#4ade80' : confidence.pct >= 60 ? '#fbbf24' : '#f87171',
+                                  display: 'inline-block',
+                                }}
+                              >
+                                {confidence.pct}%
+                              </Typography>
+                            </Tooltip>
                           </TableCell>
                           {visibleColumns.includes('category') && (
                             <TableCell sx={{ minWidth: 130 }}>
@@ -1748,11 +1927,6 @@ function RiskDiscoveryContent() {
                               </Stack>
                             </TableCell>
                           )}
-                          {visibleColumns.includes('status') && (
-                            <TableCell>
-                              <Chip size="small" label="Draft" sx={{ height: 22, bgcolor: 'grey.200', color: 'grey.700' }} />
-                            </TableCell>
-                          )}
                           {visibleColumns.includes('actions') && (
                             <TableCell align="right" onClick={(e) => e.stopPropagation()}>
                               <Stack direction="row" spacing={0.5} justifyContent="flex-end">
@@ -1772,7 +1946,7 @@ function RiskDiscoveryContent() {
                               <Box sx={{ px: 3, py: 2, bgcolor: 'rgba(255,255,255,0.02)', borderBottom: '1px solid', borderColor: 'divider' }}>
                                 <Stack spacing={1.5}>
                                   <Box>
-                                    <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                    <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>
                                       Agent reasoning
                                     </Typography>
                                     <Typography variant="body2" sx={{ mt: 0.5, color: 'text.secondary' }}>
@@ -1781,7 +1955,7 @@ function RiskDiscoveryContent() {
                                   </Box>
                                   {risk.sources.length > 0 && (
                                     <Box>
-                                      <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                      <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>
                                         Sources
                                       </Typography>
                                       <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
@@ -1792,7 +1966,7 @@ function RiskDiscoveryContent() {
                                     </Box>
                                   )}
                                   <Box>
-                                    <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                    <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>
                                       Suggested inherent
                                     </Typography>
                                     <Typography variant="body2" sx={{ mt: 0.5, color: 'text.secondary' }}>
@@ -1811,85 +1985,6 @@ function RiskDiscoveryContent() {
               </Table>
             </TableContainer>
 
-            {/* Surveys Section */}
-            {(appState === 'review' || appState === 'completed') && (
-              <Box sx={{ mt: 3 }}>
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  spacing={1}
-                  onClick={() => setSurveysExpanded(prev => !prev)}
-                  sx={{ cursor: 'pointer', mb: 1.5, userSelect: 'none' }}
-                >
-                  <Typography variant="h6" component="h3" sx={{ fontWeight: 600 }}>
-                    Agent-proposed identification surveys
-                  </Typography>
-                  <Chip size="small" label={2 - dismissedSurveys.size} sx={{ height: 20, fontSize: '0.75rem' }} />
-                  {surveysExpanded ? <ExpandLessIcon sx={{ color: 'text.secondary' }} /> : <ExpandMoreIcon sx={{ color: 'text.secondary' }} />}
-                </Stack>
-                <Collapse in={surveysExpanded}>
-                  <Stack spacing={2}>
-                    {[
-                      {
-                        idx: 0,
-                        title: 'Q1 Risk Identification Survey — IT & Security',
-                        recipients: 'IT Director, CISO, Head of Infrastructure (3 recipients)',
-                        scheduled: 'Mar 25, 2026 · Agent scheduled',
-                        questions: 8,
-                      },
-                      {
-                        idx: 1,
-                        title: 'Operational Risk Survey — Operations & Supply Chain',
-                        recipients: 'COO, VP Operations, Supply Chain Manager (3 recipients)',
-                        scheduled: 'Mar 28, 2026 · Agent scheduled',
-                        questions: 6,
-                      },
-                    ]
-                      .filter(s => !dismissedSurveys.has(s.idx))
-                      .map(survey => (
-                        <Paper key={survey.idx} variant="outlined" sx={{ p: 2.5 }}>
-                          <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1.5 }}>
-                            <Box>
-                              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{survey.title}</Typography>
-                                <Chip size="small" label="draft" variant="outlined" sx={{ height: 18, fontSize: '0.7rem' }} />
-                              </Stack>
-                              <Typography variant="body2" color="text.secondary">{survey.recipients}</Typography>
-                            </Box>
-                          </Stack>
-                          <Stack direction="row" spacing={2} sx={{ mb: 1.5 }}>
-                            <Typography variant="caption" color="text.secondary">
-                              <strong>Scheduled:</strong> {survey.scheduled}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              <strong>Questions:</strong> {survey.questions}
-                            </Typography>
-                          </Stack>
-                          <Stack direction="row" spacing={1}>
-                            <Button
-                              variant="contained"
-                              size="small"
-                              startIcon={<SendIcon />}
-                              onClick={() => setToast({ open: true, message: 'Survey approved and scheduled for sending' })}
-                            >
-                              Approve &amp; send
-                            </Button>
-                            <Button variant="outlined" size="small">Edit</Button>
-                            <Button
-                              variant="text"
-                              size="small"
-                              color="error"
-                              onClick={() => setDismissedSurveys(prev => new Set([...prev, survey.idx]))}
-                            >
-                              Discard
-                            </Button>
-                          </Stack>
-                        </Paper>
-                      ))}
-                  </Stack>
-                </Collapse>
-              </Box>
-            )}
         </Box>
       </Collapse>
 
@@ -1901,7 +1996,7 @@ function RiskDiscoveryContent() {
         PaperProps={{ sx: { width: 480, p: 3 } }}
       >
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>Intelligence Sources</Typography>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>Intelligence sources</Typography>
           <IconButton onClick={() => setSourcesDrawerOpen(false)} size="small"><CloseIcon /></IconButton>
         </Stack>
         <Box sx={{ overflow: 'auto' }}>
@@ -1915,7 +2010,7 @@ function RiskDiscoveryContent() {
             const relevanceColor: Record<string, string> = { high: '#E54E54', medium: '#C29A1D', low: '#2EB365' };
             return (
               <Box key={channelKey} sx={{ mb: 3 }}>
-                <Typography variant="caption" sx={{ fontWeight: 700, color: meta.accentColor, textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', mb: 1 }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: meta.accentColor, display: 'block', mb: 1 }}>
                   {meta.label}
                 </Typography>
                 <Stack spacing={1}>

@@ -5,7 +5,7 @@ import {
   Box, Typography, Paper, Stack, Grid, Chip, Button,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Tabs, Tab, Divider, Tooltip, IconButton, Collapse, LinearProgress,
-  Snackbar, Alert,
+  Snackbar, Alert, CircularProgress,
 } from '@mui/material';
 import {
   TrendingUp as TrendingUpIcon,
@@ -23,6 +23,7 @@ import {
   Assignment as AssignmentIcon,
   Adjust as AdjustIcon,
   Add as AddIcon,
+  DoneAll as DoneAllIcon,
 } from '@mui/icons-material';
 import Link from 'next/link';
 import {
@@ -317,7 +318,7 @@ function AgentActionPanel({ onClose, onAccept }: { onClose: () => void; onAccept
       </Stack>
 
       <Stack direction="row" spacing={1}>
-        <Button variant="contained" size="small" onClick={onAccept} sx={{ fontSize: '0.75rem' }}>
+        <Button variant="contained" size="small" startIcon={<DoneAllIcon />} onClick={onAccept} sx={{ fontSize: '0.75rem' }}>
           Accept all
         </Button>
         <Button variant="outlined" size="small" sx={{ fontSize: '0.75rem' }}>
@@ -562,9 +563,9 @@ export default function TreatmentPage() {
       ══════════════════════════════════════════════════════════════════════ */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
 
-        {/* ── 6-month residual risk trend (full width) ── */}
-        <Grid size={{ xs: 12 }}>
-          <Paper variant="outlined" sx={{ p: 2.5 }}>
+        {/* ── 6-month residual risk trend ── */}
+        <Grid size={{ xs: 12, md: 7 }}>
+          <Paper variant="outlined" sx={{ p: 2.5, height: '100%' }}>
             <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 0 }}>
               <Box>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Residual risk trend — last 6 months</Typography>
@@ -572,7 +573,7 @@ export default function TreatmentPage() {
                   Average inherent (dashed) vs residual score over time. Shaded area = risks exceeding tolerance.
                 </Typography>
               </Box>
-              <Stack direction="row" spacing={2} flexShrink={0} sx={{ pt: 0.25 }}>
+              <Stack direction="row" spacing={1.5} flexShrink={0} sx={{ pt: 0.25 }}>
                 {[
                   { color: 'rgba(255,255,255,0.3)', dash: true,  label: 'Avg inherent' },
                   { color: '#60a5fa',               dash: false, label: 'Avg residual' },
@@ -588,7 +589,7 @@ export default function TreatmentPage() {
                 ))}
               </Stack>
             </Stack>
-            <Box sx={{ height: 165, mt: 1.5 }}>
+            <Box sx={{ height: 155, mt: 1.5 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={trendHistory} margin={{ top: 6, right: 44, bottom: 0, left: 0 }}>
                   <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" />
@@ -621,13 +622,13 @@ export default function TreatmentPage() {
         </Grid>
 
         {/* ── Inherent vs residual by category ── */}
-        <Grid size={{ xs: 12 }}>
-          <Paper variant="outlined" sx={{ p: 2.5 }}>
+        <Grid size={{ xs: 12, md: 5 }}>
+          <Paper variant="outlined" sx={{ p: 2.5, height: '100%' }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.25 }}>Inherent vs residual by category</Typography>
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
               Average inherent (light) and residual (coloured) scores per risk category.
             </Typography>
-            <Box sx={{ height: 160 }}>
+            <Box sx={{ height: 155 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={categoryChartData} barCategoryGap="28%" margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>
                   <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" />
@@ -662,82 +663,87 @@ export default function TreatmentPage() {
         onChange={(_, v) => setTab(v)}
         sx={{ mb: 2.5, '& .MuiTab-root': { fontSize: '0.8125rem', minHeight: 40, py: 0 } }}
       >
+        <Tab label="Monitoring" />
         <Tab label="Risk treatment" />
         <Tab label="Controls" />
-        <Tab label="Monitoring" />
       </Tabs>
 
       {/* ══════════════════════════════════════════════════════════════════════
-          TAB 0 – Treatment plans (grouped by strategy)
+          TAB 1 – Treatment plans (grouped by strategy)
       ══════════════════════════════════════════════════════════════════════ */}
-      {tab === 0 && (
+      {tab === 1 && (
         <Box>
-          {/* Treatment strategy effectiveness chart */}
-          <Paper variant="outlined" sx={{ p: 2.5, mb: 3 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.25 }}>Treatment strategy effectiveness</Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-              Average inherent vs residual score per treatment strategy.
-            </Typography>
-            <Box sx={{ height: 160 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={treatmentEffectivenessData} barCategoryGap="30%" margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>
-                  <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" />
-                  <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                  <YAxis domain={[0, 5]} tickCount={6} tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} width={24} />
-                  <ReTooltip
-                    cursor={{ fill: 'rgba(96,165,250,0.05)' }}
-                    contentStyle={{ background: 'rgba(10,14,26,0.97)', backdropFilter: 'blur(12px)', border: '1px solid rgba(96,165,250,0.2)', borderRadius: 8, fontSize: 12, color: '#e2e8f0', boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }} itemStyle={{ color: '#94a3b8' }}
-                    formatter={(v: unknown, name: unknown) => [`${(v as number).toFixed(1)}`, name as string]}
-                  />
-                  <ReferenceLine y={APPETITE_THRESHOLD} stroke="#2EB365" strokeDasharray="4 4" strokeOpacity={0.5}
-                    label={{ value: 'Appetite', position: 'insideTopRight', fill: '#2EB365', fontSize: 11 }} />
-                  <Bar dataKey="Avg inherent" fill="rgba(255,255,255,0.1)" radius={[3, 3, 0, 0]} />
-                  <Bar dataKey="Avg residual" radius={[3, 3, 0, 0]}>
-                    {treatmentEffectivenessData.map((d, i) => (
-                      <Cell key={`te-${i}`} fill={d.color} fillOpacity={0.82} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </Box>
-          </Paper>
+          {/* Treatment strategy effectiveness chart + strategy summary — side by side */}
+          <Grid container spacing={2} sx={{ mb: 2.5 }}>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Paper variant="outlined" sx={{ p: 2.5, height: '100%' }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.25 }}>Treatment strategy effectiveness</Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+                  Average inherent vs residual score per treatment strategy.
+                </Typography>
+                <Box sx={{ height: 178 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={treatmentEffectivenessData} barCategoryGap="30%" margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>
+                      <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" />
+                      <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                      <YAxis domain={[0, 5]} tickCount={6} tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} width={24} />
+                      <ReTooltip
+                        cursor={{ fill: 'rgba(96,165,250,0.05)' }}
+                        contentStyle={{ background: 'rgba(10,14,26,0.97)', backdropFilter: 'blur(12px)', border: '1px solid rgba(96,165,250,0.2)', borderRadius: 8, fontSize: 12, color: '#e2e8f0', boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }} itemStyle={{ color: '#94a3b8' }}
+                        formatter={(v: unknown, name: unknown) => [`${(v as number).toFixed(1)}`, name as string]}
+                      />
+                      <ReferenceLine y={APPETITE_THRESHOLD} stroke="#2EB365" strokeDasharray="4 4" strokeOpacity={0.5}
+                        label={{ value: 'Appetite', position: 'insideTopRight', fill: '#2EB365', fontSize: 11 }} />
+                      <Bar dataKey="Avg inherent" fill="rgba(255,255,255,0.1)" radius={[3, 3, 0, 0]} />
+                      <Bar dataKey="Avg residual" radius={[3, 3, 0, 0]}>
+                        {treatmentEffectivenessData.map((d, i) => (
+                          <Cell key={`te-${i}`} fill={d.color} fillOpacity={0.82} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </Box>
+              </Paper>
+            </Grid>
 
-          {/* Strategy summary strip */}
-          <Stack direction="row" spacing={1.5} sx={{ mb: 2.5 }}>
-            {byStrategy.map(g => (
-              <Box key={g.strategy} sx={{ flex: 1, minWidth: 0 }}>
-                <Paper
-                  variant="outlined"
-                  onClick={() => setExpandedStrategy(expandedStrategy === g.strategy ? null : g.strategy)}
-                  sx={{
-                    p: 1.75, cursor: 'pointer',
-                    borderColor: expandedStrategy === g.strategy ? treatmentColor(g.strategy) : undefined,
-                    bgcolor: expandedStrategy === g.strategy ? `${treatmentColor(g.strategy)}08` : undefined,
-                    transition: 'all 0.18s',
-                    '&:hover': { borderColor: treatmentColor(g.strategy), bgcolor: `${treatmentColor(g.strategy)}06` },
-                  }}
-                >
-                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                    <Box sx={{ width: 3, height: 28, borderRadius: 1, bgcolor: treatmentColor(g.strategy), flexShrink: 0 }} />
-                    <Box>
-                      <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-                        {g.strategy.charAt(0).toUpperCase() + g.strategy.slice(1)}
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Grid container spacing={1} sx={{ height: '100%' }}>
+                {byStrategy.map(g => (
+                  <Grid key={g.strategy} size={{ xs: 6 }}>
+                    <Paper
+                      variant="outlined"
+                      onClick={() => setExpandedStrategy(expandedStrategy === g.strategy ? null : g.strategy)}
+                      sx={{
+                        p: 1.5, cursor: 'pointer', height: '100%',
+                        borderColor: expandedStrategy === g.strategy ? treatmentColor(g.strategy) : undefined,
+                        bgcolor: expandedStrategy === g.strategy ? `${treatmentColor(g.strategy)}08` : undefined,
+                        transition: 'all 0.18s',
+                        '&:hover': { borderColor: treatmentColor(g.strategy), bgcolor: `${treatmentColor(g.strategy)}06` },
+                      }}
+                    >
+                      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                        <Box sx={{ width: 3, height: 24, borderRadius: 1, bgcolor: treatmentColor(g.strategy), flexShrink: 0 }} />
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+                            {g.strategy.charAt(0).toUpperCase() + g.strategy.slice(1)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">{g.risks.length} risks</Typography>
+                        </Box>
+                      </Stack>
+                      <Stack direction="row" spacing={0.75} alignItems="center">
+                        <ScoreChip score={g.avgInherent} />
+                        <ArrowForwardIcon sx={{ fontSize: 12, color: 'text.disabled' }} />
+                        <ScoreChip score={g.avgResidual} />
+                      </Stack>
+                      <Typography variant="caption" sx={{ color: '#2EB365', display: 'block', mt: 0.5 }}>
+                        {g.controlCoverage}% control coverage
                       </Typography>
-                      <Typography variant="caption" color="text.secondary">{g.risks.length} risks</Typography>
-                    </Box>
-                  </Stack>
-                  <Stack direction="row" spacing={0.75} alignItems="center">
-                    <ScoreChip score={g.avgInherent} />
-                    <ArrowForwardIcon sx={{ fontSize: 12, color: 'text.disabled' }} />
-                    <ScoreChip score={g.avgResidual} />
-                  </Stack>
-                  <Typography variant="caption" sx={{ color: '#2EB365', display: 'block', mt: 0.5 }}>
-                    {g.controlCoverage}% control coverage
-                  </Typography>
-                </Paper>
-              </Box>
-            ))}
-          </Stack>
+                    </Paper>
+                  </Grid>
+                ))}
+              </Grid>
+            </Grid>
+          </Grid>
 
           {/* Agent actions toggle */}
           <Stack direction="row" alignItems="center" sx={{ mb: 1.5 }}>
@@ -789,7 +795,7 @@ export default function TreatmentPage() {
                 <Divider />
                 <Table size="small">
                   <TableHead>
-                    <TableRow sx={{ '& .MuiTableCell-head': { fontWeight: 600, fontSize: '0.75rem', color: 'text.secondary', py: 0.75, bgcolor: 'rgba(10,16,30,0.3)' } }}>
+                    <TableRow>
                       <TableCell sx={{ width: 72 }}>ID</TableCell>
                       <TableCell>Risk</TableCell>
                       <TableCell>Category</TableCell>
@@ -954,62 +960,14 @@ export default function TreatmentPage() {
       )}
 
       {/* ══════════════════════════════════════════════════════════════════════
-          TAB 1 – Controls register
+          TAB 2 – Controls register
       ══════════════════════════════════════════════════════════════════════ */}
-      {tab === 1 && (
+      {tab === 2 && (
         <Box>
-          {/* Control effectiveness chart */}
-          <Paper variant="outlined" sx={{ p: 2.5, mb: 3 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.25 }}>Control effectiveness</Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-              Effectiveness rating per control (1–5). Colour = control type.
-            </Typography>
-            <Box sx={{ height: 200 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={controlEffectivenessData}
-                  layout="vertical"
-                  barCategoryGap="20%"
-                  margin={{ left: 0, right: 24, top: 0, bottom: 0 }}
-                >
-                  <CartesianGrid horizontal={false} stroke="rgba(255,255,255,0.05)" />
-                  <XAxis type="number" domain={[0, 5]} tickCount={6} tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                  <YAxis dataKey="name" type="category" width={120}
-                    tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false}
-                    tickFormatter={v => v.length > 18 ? v.slice(0, 18) + '…' : v} />
-                  <ReTooltip
-                    cursor={{ fill: 'rgba(96,165,250,0.05)' }}
-                    contentStyle={{ background: 'rgba(10,14,26,0.97)', backdropFilter: 'blur(12px)', border: '1px solid rgba(96,165,250,0.2)', borderRadius: 8, fontSize: 12, color: '#e2e8f0', boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }} itemStyle={{ color: '#94a3b8' }}
-                    formatter={(v: unknown) => [`${v}/5`, 'Effectiveness']}
-                  />
-                  <Bar dataKey="effectiveness" radius={[0, 3, 3, 0]}>
-                    {controlEffectivenessData.map((d, i) => (
-                      <Cell key={`ce-${i}`} fill={d.color} fillOpacity={0.82} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </Box>
-          </Paper>
-
-          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-            <Typography variant="body2" color="text.secondary">
-              {MOCK_CONTROLS.length} controls across {risks.length} risks
-            </Typography>
-            <Stack direction="row" spacing={1.5}>
-              {(['preventive', 'detective', 'corrective'] as const).map(t => (
-                <Stack key={t} direction="row" spacing={0.5} alignItems="center">
-                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: controlTypeColor(t) }} />
-                  <Typography variant="caption" color="text.secondary">{t.charAt(0).toUpperCase() + t.slice(1)}</Typography>
-                </Stack>
-              ))}
-            </Stack>
-          </Stack>
-
           <TableContainer component={Paper} variant="outlined">
             <Table size="small">
               <TableHead>
-                <TableRow sx={{ '& .MuiTableCell-head': { fontWeight: 600, fontSize: '0.75rem', color: 'text.secondary', py: 1 } }}>
+                <TableRow>
                   <TableCell>Control</TableCell>
                   <TableCell>Type</TableCell>
                   <TableCell>Status</TableCell>
@@ -1123,44 +1081,297 @@ export default function TreatmentPage() {
       )}
 
       {/* ══════════════════════════════════════════════════════════════════════
-          TAB 2 – Monitoring
+          TAB 0 – Monitoring
       ══════════════════════════════════════════════════════════════════════ */}
-      {tab === 2 && (
+      {tab === 0 && (() => {
+        const monitoringUrgent = kriSummary.red > 0 || stats.exceededTolerance > 0;
+        const monitoringWarning = !monitoringUrgent && (kriSummary.amber > 0 || trendSummary.worsening > 0);
+        const monitoringBorderColor = monitoringUrgent ? '#f87171' : monitoringWarning ? '#fbbf24' : '#4ade80';
+        const monitoringBannerBg = monitoringUrgent
+          ? 'rgba(248,113,113,0.04)' : monitoringWarning
+          ? 'rgba(251,191,36,0.03)' : 'rgba(74,222,128,0.03)';
+
+        const summaryParts: string[] = [];
+        if (kriSummary.red > 0) summaryParts.push(`${kriSummary.red} KRI${kriSummary.red > 1 ? 's' : ''} in red`);
+        if (stats.exceededTolerance > 0) summaryParts.push(`${stats.exceededTolerance} risk${stats.exceededTolerance > 1 ? 's' : ''} exceeding tolerance`);
+        if (trendSummary.worsening > 0) summaryParts.push(`${trendSummary.worsening} risk${trendSummary.worsening > 1 ? 's' : ''} trending upward`);
+        if (kriSummary.amber > 0) summaryParts.push(`${kriSummary.amber} KRI${kriSummary.amber > 1 ? 's' : ''} in amber`);
+        const monitoringBannerText = summaryParts.length === 0
+          ? 'All KRIs green and risks within appetite. Portfolio is in good standing.'
+          : (summaryParts.slice(0, 3).join(', ') + '. ' + (monitoringUrgent ? 'Review priority actions below.' : 'Monitor closely.'));
+
+        const exceededRisks = risks.filter(r => r.vsAppetite === 'exceeded');
+        const redKRIs = kris.filter(k => k.status === 'red');
+        const worseningRisks = risks.filter(r => r.trend === 'worsening' && r.vsAppetite !== 'exceeded');
+        const totalPriority = exceededRisks.length + redKRIs.length + worseningRisks.length + 1;
+
+        return (
         <Box>
-          {/* ── KRI Dashboard ── */}
-          <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>Key Risk Indicators</Typography>
-            <Chip label={`${kriSummary.red} RED`} size="small"
-              sx={{ bgcolor: '#C42B31', color: '#fff', fontWeight: 700 }} />
-            <Chip label={`${kriSummary.amber} AMBER`} size="small"
-              sx={{ bgcolor: '#C29A1D', color: '#fff', fontWeight: 700 }} />
-            <Chip label={`${kriSummary.green} GREEN`} size="small"
-              sx={{ bgcolor: '#2EB365', color: '#fff', fontWeight: 700 }} />
-            <Box sx={{ flexGrow: 1 }} />
+          {/* ── Monitoring summary banner ── */}
+          <Paper variant="outlined" sx={{
+            mb: 2.5, px: 2.5, py: 1.75,
+            borderLeft: `3px solid ${monitoringBorderColor}`,
+            bgcolor: monitoringBannerBg,
+          }}>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Box sx={{
+                width: 28, height: 28, borderRadius: 1, flexShrink: 0,
+                background: 'linear-gradient(135deg,#5C6BC0,#9C27B0,#E91E63)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <AgentIcon sx={{ fontSize: 14, color: 'white' }} />
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.5 }}>
+                  {monitoringBannerText}
+                </Typography>
+                <Typography variant="caption" color="text.disabled">
+                  Risk Agent · Monitoring · Updated just now
+                </Typography>
+              </Box>
+              {(monitoringUrgent || monitoringWarning) && (
+                <Chip size="small"
+                  label={monitoringUrgent ? 'Action required' : 'Review recommended'}
+                  sx={{
+                    height: 20, fontSize: '0.68rem', flexShrink: 0,
+                    bgcolor: monitoringUrgent ? 'rgba(248,113,113,0.1)' : 'rgba(251,191,36,0.1)',
+                    color: monitoringUrgent ? '#f87171' : '#fbbf24',
+                    border: `1px solid ${monitoringUrgent ? 'rgba(248,113,113,0.25)' : 'rgba(251,191,36,0.25)'}`,
+                  }}
+                />
+              )}
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={kriReviewLoading
+                  ? <CircularProgress size={11} sx={{ color: 'inherit' }} />
+                  : <AgentIcon sx={{ fontSize: '13px !important' }} />}
+                disabled={kriReviewLoading}
+                sx={{ flexShrink: 0, fontSize: '0.78rem' }}
+                onClick={() => {
+                  setKriReviewLoading(true);
+                  setTimeout(() => {
+                    setKriReviewLoading(false);
+                    setSnackbar({ open: true, message: 'KRI values updated from latest data' });
+                  }, 1800);
+                }}
+              >
+                {kriReviewLoading ? 'Reviewing…' : 'Run agent review'}
+              </Button>
+            </Stack>
+          </Paper>
+
+          {/* ── Priority actions ── */}
+          <Box sx={{ mb: 2.5 }}>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.25 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Priority actions</Typography>
+              <Chip
+                size="small"
+                label={`${totalPriority} pending`}
+                sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'rgba(251,191,36,0.08)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.2)' }}
+              />
+            </Stack>
+
+            <Stack spacing={0.75}>
+              {/* Tolerance-exceeded risks */}
+              {exceededRisks.slice(0, 3).map(risk => (
+                <Paper
+                  key={risk.id}
+                  variant="outlined"
+                  sx={{ px: 2, py: 1.25, borderLeft: '2px solid #E54E54', bgcolor: 'rgba(229,78,84,0.025)' }}
+                >
+                  <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Chip label="TOLERANCE EXCEEDED" size="small" sx={{
+                      height: 19, fontSize: '0.66rem', fontWeight: 700, flexShrink: 0,
+                      bgcolor: 'rgba(229,78,84,0.12)', color: '#E54E54',
+                      border: '1px solid rgba(229,78,84,0.3)',
+                    }} />
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>{risk.title}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Residual {risk.residualScore.toFixed(1)} — exceeds tolerance of {TOLERANCE_THRESHOLD}
+                        {risk.trend === 'worsening' ? ' · Trend worsening' : ''}
+                      </Typography>
+                    </Box>
+                    <Stack direction="row" spacing={0.75} flexShrink={0}>
+                      <Button
+                        component={Link}
+                        href={`/risks/${risk.id}`}
+                        variant="outlined"
+                        size="small"
+                        startIcon={<ArrowForwardIcon sx={{ fontSize: '12px !important' }} />}
+                        sx={{ fontSize: '0.75rem', py: 0.375 }}
+                      >
+                        Review treatment
+                      </Button>
+                      <Button variant="text" size="small"
+                        sx={{ fontSize: '0.75rem', color: 'text.secondary', py: 0.375 }}
+                        onClick={() => setSnackbar({ open: true, message: 'Alert dismissed' })}>
+                        Dismiss
+                      </Button>
+                    </Stack>
+                  </Stack>
+                </Paper>
+              ))}
+
+              {/* Red KRIs */}
+              {redKRIs.slice(0, 2).map(kri => (
+                <Paper
+                  key={kri.id}
+                  variant="outlined"
+                  sx={{ px: 2, py: 1.25, borderLeft: '2px solid #C42B31', bgcolor: 'rgba(196,43,49,0.025)' }}
+                >
+                  <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Chip label="KRI BREACH" size="small" sx={{
+                      height: 19, fontSize: '0.66rem', fontWeight: 700, flexShrink: 0,
+                      bgcolor: 'rgba(196,43,49,0.12)', color: '#E54E54',
+                      border: '1px solid rgba(196,43,49,0.3)',
+                    }} />
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>{kri.name}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Current value {kri.currentValue} {kri.threshold.unit} has breached red threshold
+                        {kri.agentNote ? ` · ${kri.agentNote}` : ''}
+                      </Typography>
+                    </Box>
+                    <Stack direction="row" spacing={0.75} flexShrink={0}>
+                      <Button
+                        component={Link}
+                        href="/kris"
+                        variant="outlined"
+                        size="small"
+                        startIcon={<ArrowForwardIcon sx={{ fontSize: '12px !important' }} />}
+                        sx={{ fontSize: '0.75rem', py: 0.375 }}
+                      >
+                        View KRI
+                      </Button>
+                      <Button
+                        component={Link}
+                        href="/assessments"
+                        variant="outlined"
+                        size="small"
+                        startIcon={<ArrowForwardIcon sx={{ fontSize: '12px !important' }} />}
+                        sx={{ fontSize: '0.75rem', py: 0.375 }}
+                      >
+                        Trigger reassessment
+                      </Button>
+                    </Stack>
+                  </Stack>
+                </Paper>
+              ))}
+
+              {/* Worsening trends */}
+              {worseningRisks.slice(0, 2).map(risk => (
+                <Paper
+                  key={risk.id}
+                  variant="outlined"
+                  sx={{ px: 2, py: 1.25, borderLeft: '2px solid #C29A1D', bgcolor: 'rgba(194,154,29,0.025)' }}
+                >
+                  <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Chip label="TREND ALERT" size="small" sx={{
+                      height: 19, fontSize: '0.66rem', fontWeight: 700, flexShrink: 0,
+                      bgcolor: 'rgba(194,154,29,0.12)', color: '#C29A1D',
+                      border: '1px solid rgba(194,154,29,0.3)',
+                    }} />
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>{risk.title}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Score trending upward — residual {risk.residualScore.toFixed(1)} approaching tolerance
+                      </Typography>
+                    </Box>
+                    <Stack direction="row" spacing={0.75} flexShrink={0}>
+                      <Button
+                        component={Link}
+                        href="/assessments"
+                        variant="outlined"
+                        size="small"
+                        startIcon={<ArrowForwardIcon sx={{ fontSize: '12px !important' }} />}
+                        sx={{ fontSize: '0.75rem', py: 0.375 }}
+                      >
+                        Schedule review
+                      </Button>
+                      <Button variant="text" size="small"
+                        sx={{ fontSize: '0.75rem', color: 'text.secondary', py: 0.375 }}
+                        onClick={() => setSnackbar({ open: true, message: 'Alert dismissed' })}>
+                        Dismiss
+                      </Button>
+                    </Stack>
+                  </Stack>
+                </Paper>
+              ))}
+
+              {/* Static agent recommendation */}
+              <Paper
+                variant="outlined"
+                sx={{ px: 2, py: 1.25, borderLeft: '2px solid #3b82f6', bgcolor: 'rgba(59,130,246,0.025)' }}
+              >
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <Chip label="AGENT RECOMMENDATION" size="small" sx={{
+                    height: 19, fontSize: '0.66rem', fontWeight: 700, flexShrink: 0,
+                    bgcolor: 'rgba(59,130,246,0.12)', color: '#3b82f6',
+                    border: '1px solid rgba(59,130,246,0.3)',
+                  }} />
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      Cloud infrastructure exposure — 90 days unassessed
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      KRI-001 currently RED · Agent recommends reassessment to validate control effectiveness
+                    </Typography>
+                  </Box>
+                  <Stack direction="row" spacing={0.75} flexShrink={0}>
+                    <Button
+                      component={Link}
+                      href="/assessments"
+                      variant="contained"
+                      size="small"
+                      startIcon={<ArrowForwardIcon sx={{ fontSize: '12px !important' }} />}
+                      sx={{ fontSize: '0.75rem', py: 0.375 }}
+                    >
+                      Start assessment
+                    </Button>
+                    <Button variant="text" size="small"
+                      sx={{ fontSize: '0.75rem', color: 'text.secondary', py: 0.375 }}
+                      onClick={() => setSnackbar({ open: true, message: 'Alert dismissed' })}>
+                      Dismiss
+                    </Button>
+                  </Stack>
+                </Stack>
+              </Paper>
+            </Stack>
+          </Box>
+
+          {/* ── KRI section ── */}
+          <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1.5 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Key risk indicators</Typography>
+            {kriSummary.red > 0 && (
+              <Chip size="small" label={`${kriSummary.red} red`} sx={{ height: 19, fontSize: '0.68rem', fontWeight: 700, bgcolor: 'rgba(196,43,49,0.15)', color: '#E54E54', border: '1px solid rgba(196,43,49,0.3)' }} />
+            )}
+            {kriSummary.amber > 0 && (
+              <Chip size="small" label={`${kriSummary.amber} amber`} sx={{ height: 19, fontSize: '0.68rem', fontWeight: 700, bgcolor: 'rgba(194,154,29,0.12)', color: '#C29A1D', border: '1px solid rgba(194,154,29,0.3)' }} />
+            )}
+            {kriSummary.green > 0 && (
+              <Chip size="small" label={`${kriSummary.green} green`} sx={{ height: 19, fontSize: '0.68rem', fontWeight: 700, bgcolor: 'rgba(46,179,101,0.1)', color: '#2EB365', border: '1px solid rgba(46,179,101,0.25)' }} />
+            )}
+            <Box sx={{ flex: 1 }} />
             <Button
+              component={Link}
+              href="/kris"
               variant="outlined"
               size="small"
-              startIcon={<AddIcon />}
-              sx={{ fontSize: '0.75rem' }}
-              onClick={() => setSnackbar({ open: true, message: 'KRI creation coming soon' })}
+              startIcon={<OpenInNewIcon sx={{ fontSize: '13px !important' }} />}
+              sx={{ fontSize: '0.78rem' }}
             >
-              Add KRI
+              Manage KRIs
             </Button>
             <Button
               variant="outlined"
               size="small"
-              startIcon={kriReviewLoading ? undefined : <AgentIcon />}
-              sx={{ fontSize: '0.75rem' }}
-              disabled={kriReviewLoading}
-              onClick={() => {
-                setKriReviewLoading(true);
-                setTimeout(() => {
-                  setKriReviewLoading(false);
-                  setSnackbar({ open: true, message: 'KRI values updated from latest data' });
-                }, 1800);
-              }}
+              startIcon={<AddIcon sx={{ fontSize: '13px !important' }} />}
+              sx={{ fontSize: '0.78rem' }}
+              onClick={() => setSnackbar({ open: true, message: 'KRI creation — visit the KRI management page' })}
             >
-              {kriReviewLoading ? 'Reviewing…' : 'Run agent KRI review'}
+              Add KRI
             </Button>
           </Stack>
 
@@ -1172,55 +1383,6 @@ export default function TreatmentPage() {
             ))}
           </Grid>
 
-          {/* ── Agent alert triage ── */}
-          <Paper variant="outlined" sx={{ mb: 3, overflow: 'hidden' }}>
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ px: 2, py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-              <AgentIcon sx={{ fontSize: 16, color: '#60a5fa' }} />
-              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Agent alerts</Typography>
-            </Stack>
-            <Table size="small">
-              <TableHead>
-                <TableRow sx={{ '& .MuiTableCell-head': { fontWeight: 600, fontSize: '0.75rem', color: 'text.secondary', py: 0.75, bgcolor: 'rgba(10,16,30,0.3)' } }}>
-                  <TableCell>Type</TableCell>
-                  <TableCell>Risk</TableCell>
-                  <TableCell>Message</TableCell>
-                  <TableCell>Time</TableCell>
-                  <TableCell />
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                <TableRow sx={{ '& .MuiTableCell-body': { py: 1 } }}>
-                  <TableCell>
-                    <Chip label="REASSESSMENT" size="small"
-                      sx={{ height: 20, fontSize: '0.7rem', bgcolor: 'rgba(59,130,246,0.15)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.3)', fontWeight: 700 }} />
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>CR-014 Cloud Infrastructure Exposure</Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="caption" color="text.secondary">
-                      90d unassessed + KRI-001 RED — reassessment recommended
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="caption" color="text.secondary">1d ago</Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    <Stack direction="row" spacing={0.75} justifyContent="flex-end">
-                      <Button component={Link} href="/assessments" variant="outlined" size="small"
-                        sx={{ fontSize: '0.7rem', py: 0.25 }}>
-                        Start assessment
-                      </Button>
-                      <Button variant="text" size="small" sx={{ fontSize: '0.7rem', color: 'text.secondary', py: 0.25 }}>
-                        Dismiss
-                      </Button>
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </Paper>
-
           {/* ── Risk position map + score reduction + status overview ── */}
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, md: 5 }}>
@@ -1229,7 +1391,7 @@ export default function TreatmentPage() {
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
                   Each dot is one risk. Below the diagonal = reduced by controls. Bands show appetite zones.
                 </Typography>
-                <Box sx={{ height: 250 }}>
+                <Box sx={{ height: 220 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <ScatterChart margin={{ top: 8, right: 16, bottom: 20, left: 8 }}>
                       <CartesianGrid stroke="rgba(255,255,255,0.05)" />
@@ -1287,7 +1449,7 @@ export default function TreatmentPage() {
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
                   Faded bar = inherent. Coloured bar = residual after treatment.
                 </Typography>
-                <Box sx={{ height: 260 }}>
+                <Box sx={{ height: 220 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={[...risks].sort((a, b) => b.inherentScore - a.inherentScore).slice(0, 10).map(r => ({
@@ -1397,7 +1559,8 @@ export default function TreatmentPage() {
             </Grid>
           </Grid>
         </Box>
-      )}
+        );
+      })()}
 
       {/* ── Snackbar ── */}
       <Snackbar
