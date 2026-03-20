@@ -31,12 +31,13 @@ interface ApprovalCardProps {
   onViewDetails: (id: string) => void;
 }
 
-const taskTypeConfig: Record<AgentTaskType, { label: string; icon: React.ReactElement; color: string }> = {
-  identify: { label: 'Risk identified', icon: <AddIcon fontSize="small" />, color: '#1976d2' },
-  assess: { label: 'Assessment', icon: <AssessmentIcon fontSize="small" />, color: '#ed6c02' },
-  suggest_controls: { label: 'Control suggestion', icon: <SecurityIcon fontSize="small" />, color: '#2e7d32' },
-  monitor: { label: 'Monitoring alert', icon: <WarningIcon fontSize="small" />, color: '#d32f2f' },
-  report: { label: 'Report ready', icon: <AssessmentIcon fontSize="small" />, color: '#9c27b0' },
+// Neutral styling for task type chips — type alone carries meaning, not color
+const taskTypeConfig: Record<AgentTaskType, { label: string; icon: React.ReactElement }> = {
+  identify:         { label: 'Risk identified',   icon: <AddIcon fontSize="small" /> },
+  assess:           { label: 'Assessment',         icon: <AssessmentIcon fontSize="small" /> },
+  suggest_controls: { label: 'Control suggestion', icon: <SecurityIcon fontSize="small" /> },
+  monitor:          { label: 'Monitoring alert',   icon: <WarningIcon fontSize="small" /> },
+  report:           { label: 'Report ready',       icon: <AssessmentIcon fontSize="small" /> },
 };
 
 export function ApprovalCard({ request, onApprove, onReject, onViewDetails }: ApprovalCardProps) {
@@ -55,7 +56,7 @@ export function ApprovalCard({ request, onApprove, onReject, onViewDetails }: Ap
     <Card 
       sx={{ 
         position: 'relative',
-        borderLeft: `4px solid ${config.color}`,
+        borderLeft: '4px solid rgba(96,165,250,0.4)',
         '&:hover': {
           boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
         },
@@ -71,8 +72,8 @@ export function ApprovalCard({ request, onApprove, onReject, onViewDetails }: Ap
               width: 40,
               height: 40,
               borderRadius: '50%',
-              backgroundColor: `${config.color}15`,
-              color: config.color,
+              backgroundColor: 'rgba(96,165,250,0.1)',
+              color: 'primary.light',
             }}
           >
             <AiIcon />
@@ -96,11 +97,7 @@ export function ApprovalCard({ request, onApprove, onReject, onViewDetails }: Ap
               size="small"
               icon={config.icon}
               label={config.label}
-              sx={{ 
-                backgroundColor: `${config.color}15`,
-                color: config.color,
-                '& .MuiChip-icon': { color: config.color },
-              }}
+              variant="outlined"
             />
             <Typography variant="caption" color="text.secondary">
               {formatDate(request.createdAt)}
@@ -116,7 +113,7 @@ export function ApprovalCard({ request, onApprove, onReject, onViewDetails }: Ap
         
         <Box sx={{ backgroundColor: 'rgba(13, 17, 23, 0.5)', borderRadius: 1, p: 2, mb: 2, border: '1px solid rgba(96, 165, 250, 0.08)' }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-            AI reasoning
+            Agent reasoning
           </Typography>
           <Typography variant="body2" color="text.secondary">
             {request.reasoning}

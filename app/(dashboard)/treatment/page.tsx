@@ -129,16 +129,17 @@ function deriveMetrics(risk: RiskSuggestion): EnrichedRisk {
 const scoreColor = getScoreColor;
 const scoreLabel = getScoreLabel;
 
-function treatmentColor(t: TreatmentStrategy): string {
-  return t === 'mitigate' ? '#0060C7' : t === 'accept' ? '#2EB365' : t === 'transfer' ? '#9530DC' : '#C29A1D';
+// Strategy and control type chips are neutral — they classify, not indicate severity
+function treatmentColor(_t: TreatmentStrategy): string {
+  return '#60a5fa';
 }
 
-function controlTypeColor(t: string): string {
-  return t === 'preventive' ? '#0060C7' : t === 'detective' ? '#9530DC' : '#C29A1D';
+function controlTypeColor(_t: string): string {
+  return '#60a5fa';
 }
 
 function controlStatusColor(s: ControlStatus): string {
-  return s === 'implemented' ? '#2EB365' : s === 'in_progress' ? '#C29A1D' : '#94a3b8';
+  return s === 'implemented' ? '#4ade80' : s === 'in_progress' ? '#fbbf24' : '#94a3b8';
 }
 
 function kriStatusColor(status: string): string {
@@ -318,14 +319,14 @@ function AgentActionPanel({ onClose, onAccept }: { onClose: () => void; onAccept
       </Stack>
 
       <Stack direction="row" spacing={1}>
-        <Button variant="contained" size="small" startIcon={<DoneAllIcon />} onClick={onAccept} sx={{ fontSize: '0.75rem' }}>
-          Accept all
+        <Button variant="text" size="small" onClick={onClose} sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
+          Cancel
         </Button>
         <Button variant="outlined" size="small" sx={{ fontSize: '0.75rem' }}>
           Review individually
         </Button>
-        <Button variant="text" size="small" onClick={onClose} sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
-          Cancel
+        <Button variant="contained" size="small" startIcon={<DoneAllIcon />} onClick={onAccept} sx={{ fontSize: '0.75rem' }}>
+          Accept all
         </Button>
       </Stack>
     </Paper>
@@ -491,7 +492,7 @@ export default function TreatmentPage() {
         <Box>
           <Stack direction="row" spacing={1} alignItems="center">
             <MonitorIcon sx={{ color: '#60a5fa', fontSize: 22 }} />
-            <Typography variant="h5" sx={{ fontWeight: 700 }}>Treatment & Monitoring</Typography>
+            <Typography variant="h1" component="h1">Treatment & monitoring</Typography>
           </Stack>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
             Track residual risk, treatment strategies, controls, and performance against appetite

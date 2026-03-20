@@ -120,7 +120,6 @@ function RiskVisualizations({ risks, onCellClick }: { risks: RiskSuggestion[]; o
                       data={Object.entries(categoryCount).map(([name, value]) => ({
                         name: name.charAt(0).toUpperCase() + name.slice(1),
                         value,
-                        color: categoryColors[name] || '#6B7280',
                       }))}
                       cx="50%"
                       cy="50%"
@@ -130,9 +129,10 @@ function RiskVisualizations({ risks, onCellClick }: { risks: RiskSuggestion[]; o
                       dataKey="value"
                       stroke="none"
                     >
-                      {Object.entries(categoryCount).map(([name], index) => (
-                        <Cell key={`cell-${index}`} fill={categoryColors[name] || '#6B7280'} />
-                      ))}
+                      {Object.entries(categoryCount).map(([, ], index) => {
+                        const shades = ['#60a5fa','#93c5fd','#3b82f6','#bfdbfe','#2563eb'];
+                        return <Cell key={`cell-${index}`} fill={shades[index % shades.length]} />;
+                      })}
                     </Pie>
                     <RechartsTooltip
                       formatter={(value: unknown) => [`${(value as number) ?? 0} risks`, '']}
@@ -167,14 +167,16 @@ function RiskVisualizations({ risks, onCellClick }: { risks: RiskSuggestion[]; o
                 </Box>
               </Box>
               <Stack spacing={1} sx={{ flex: 1 }}>
-                {Object.entries(categoryCount).map(([category, count]) => (
+                {Object.entries(categoryCount).map(([category, count], index) => {
+                  const shades = ['#60a5fa','#93c5fd','#3b82f6','#bfdbfe','#2563eb'];
+                  return (
                   <Stack key={category} direction="row" spacing={1} alignItems="center">
                     <Box
                       sx={{
                         width: 12,
                         height: 12,
                         borderRadius: 0.5,
-                        bgcolor: categoryColors[category] || '#6B7280',
+                        bgcolor: shades[index % shades.length],
                       }}
                     />
                     <Typography variant="body2" sx={{ textTransform: 'capitalize', flex: 1 }}>
@@ -184,7 +186,8 @@ function RiskVisualizations({ risks, onCellClick }: { risks: RiskSuggestion[]; o
                       {count}
                     </Typography>
                   </Stack>
-                ))}
+                  );
+                })}
               </Stack>
             </Box>
           </Paper>
@@ -499,8 +502,8 @@ export default function RiskRegisterPage() {
   return (
     <Box>
       <Box sx={{ mb: 2 }}>
-        <Typography variant="h4" component="h1" sx={{ fontWeight: 600 }}>
-          Risk Register
+        <Typography variant="h1" component="h1">
+          Risk register
         </Typography>
       </Box>
 
@@ -538,20 +541,22 @@ export default function RiskRegisterPage() {
               component={Link}
               href="/"
               size="small"
-              variant="outlined"
-              startIcon={<AgentIcon sx={{ fontSize: '14px !important' }} />}
-              sx={{
-                fontSize: '0.75rem',
-                borderColor: '#3b82f6',
-                color: '#3b82f6',
-                '&:hover': { borderColor: '#3b82f6', bgcolor: 'rgba(59,130,246,0.08)' },
-              }}
+              variant="text"
             >
               Identify new risks
             </Button>
             <Button
               component={Link}
               href="/?new=true"
+              size="small"
+              variant="outlined"
+              startIcon={<AddIcon />}
+            >
+              Add manually
+            </Button>
+            <Button
+              component={Link}
+              href="/"
               size="small"
               variant="contained"
               startIcon={<AgentIcon sx={{ fontSize: '14px !important' }} />}

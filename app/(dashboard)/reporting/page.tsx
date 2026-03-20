@@ -100,13 +100,14 @@ const HEATMAP: number[][] = [
   [3, 2, 1, 1, 0], // L=1
 ];
 
+// KRI status uses numeric scale 1–5 with qualitative labels; no RAG text
 const KRI_ROWS = [
-  { kri: 'Unpatched CVEs',          start: '1',   end: '4',   trend: 'up',   from: 'Green', to: 'Red'   },
-  { kri: 'FX Hedge Ratio',          start: '92%', end: '74%', trend: 'down', from: 'Green', to: 'Red'   },
-  { kri: 'Regulatory Findings >30d',start: '0%',  end: '12%', trend: 'up',   from: 'Green', to: 'Red'   },
-  { kri: 'Failed Auth Attempts/wk', start: '12',  end: '18',  trend: 'up',   from: 'Green', to: 'Amber' },
-  { kri: 'DR Test (days since)',     start: '45',  end: '214', trend: 'up',   from: 'Green', to: 'Red'   },
-  { kri: 'Control Test Coverage',   start: '91%', end: '87%', trend: 'down', from: 'Green', to: 'Amber' },
+  { kri: 'Unpatched CVEs',          start: '1 — Very low', end: '4 — High',      trend: 'up',   fromScore: 1, toScore: 4 },
+  { kri: 'FX Hedge Ratio',          start: '1 — Very low', end: '4 — High',      trend: 'down', fromScore: 1, toScore: 4 },
+  { kri: 'Regulatory findings >30d',start: '1 — Very low', end: '4 — High',      trend: 'up',   fromScore: 1, toScore: 4 },
+  { kri: 'Failed auth attempts/wk', start: '2 — Low',      end: '3 — Medium',    trend: 'up',   fromScore: 2, toScore: 3 },
+  { kri: 'DR test (days since)',     start: '1 — Very low', end: '5 — Critical',  trend: 'up',   fromScore: 1, toScore: 5 },
+  { kri: 'Control test coverage',   start: '1 — Very low', end: '3 — Medium',    trend: 'down', fromScore: 1, toScore: 3 },
 ];
 
 const HISTORY_ROWS = [
@@ -135,10 +136,8 @@ function statusColor(status: string): string {
   return '#94a3b8';
 }
 
-function ragColor(label: string): string {
-  if (label === 'Red')   return '#C42B31';
-  if (label === 'Amber') return '#C29A1D';
-  return '#2EB365';
+function scoreColor(score: number): string {
+  return getScoreColor(score);
 }
 
 interface SectionProps {
@@ -147,10 +146,10 @@ interface SectionProps {
   children: React.ReactNode;
 }
 
-function ReportSection({ borderColor, title, children }: SectionProps) {
+function ReportSection({ title, children }: Omit<SectionProps, 'borderColor'>) {
   return (
-    <Box sx={{ pl: 2, borderLeft: `3px solid ${borderColor}`, mb: 3.5 }}>
-      <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5, fontSize: '0.9rem', color: borderColor }}>
+    <Box sx={{ pl: 2, borderLeft: '3px solid rgba(96,165,250,0.4)', mb: 3.5 }}>
+      <Typography variant="h3" component="h3" sx={{ mb: 1.5, color: 'text.primary' }}>
         {title}
       </Typography>
       {children}
@@ -396,17 +395,17 @@ export default function ReportingPage() {
     <Box>
       {/* Page header */}
       <Stack sx={{ mb: 3 }}>
-        <Typography variant="h4" component="h1" sx={{ fontWeight: 600 }}>Reporting</Typography>
+        <Typography variant="h1" component="h1">Reporting</Typography>
         <Typography variant="body2" color="text.secondary">AI-generated risk summaries and portfolio reports</Typography>
       </Stack>
 
       {/* Generator */}
       <Paper variant="outlined" sx={{ p: 2.5, mb: 3 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Generate report</Typography>
+          <Typography variant="h2" component="h2">Generate report</Typography>
           <Chip size="small" label="Latest: Q1 2026 · Mar 19"
-            icon={<AutoAwesomeIcon sx={{ fontSize: '11px !important' }} />}
-            sx={{ height: 20, fontSize: '0.7rem', bgcolor: 'rgba(96,165,250,0.08)', color: 'primary.light', border: '1px solid rgba(96,165,250,0.2)' }} />
+            variant="outlined"
+            sx={{ height: 20, fontSize: '0.7rem' }} />
         </Stack>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }}>
           <FormControl size="small" sx={{ minWidth: 200 }}>
@@ -425,7 +424,7 @@ export default function ReportingPage() {
               <MenuItem value="custom">Custom range</MenuItem>
             </Select>
           </FormControl>
-          <Button variant="contained" startIcon={<AutoAwesomeIcon />} onClick={() => { setReportGenerated(false); setIsGenerating(true); }} disabled={isGenerating}>
+          <Button variant="contained" startIcon={<RegenerateIcon />} onClick={() => { setReportGenerated(false); setIsGenerating(true); }} disabled={isGenerating}>
             Regenerate
           </Button>
         </Stack>
@@ -446,8 +445,8 @@ export default function ReportingPage() {
               <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 0.5 }}>
                 <Typography variant="h5" sx={{ fontWeight: 700 }}>Q1 2026 — Enterprise Risk Report</Typography>
                 <Chip size="small" label="Executive summary" variant="outlined" sx={{ height: 20, fontSize: '0.72rem' }} />
-                <Chip size="small" label="Agent-generated" icon={<AutoAwesomeIcon sx={{ fontSize: '12px !important' }} />}
-                  sx={{ height: 20, fontSize: '0.72rem', bgcolor: 'rgba(96,165,250,0.1)', color: 'primary.light', border: '1px solid rgba(96,165,250,0.25)' }} />
+                <Chip size="small" label="Agent-generated" variant="outlined"
+                  sx={{ height: 20, fontSize: '0.72rem' }} />
               </Stack>
               <Typography variant="caption" color="text.secondary">Period: Oct 2025 – Mar 2026 · Generated: Mar 19, 2026</Typography>
             </Box>
@@ -486,7 +485,7 @@ export default function ReportingPage() {
           <Divider sx={{ mb: 3 }} />
 
           {/* ── 1. Portfolio snapshot ────────────────────────────────────── */}
-          <ReportSection borderColor="#0060C7" title="Portfolio snapshot">
+          <ReportSection title="Portfolio snapshot">
             <Grid container spacing={2} sx={{ mb: 0 }}>
               {[
                 { label: 'Total active risks', value: '50', sub: '+3 vs Q4 2025',   color: '#e2e8f0' },
@@ -508,7 +507,7 @@ export default function ReportingPage() {
           </ReportSection>
 
           {/* ── 2. Heatmap + Category breakdown ─────────────────────────── */}
-          <ReportSection borderColor="#9530DC" title="Risk distribution">
+          <ReportSection title="Risk distribution">
             <Grid container spacing={3}>
               <Grid size={{ xs: 12, md: 5 }}>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1, fontWeight: 600 }}>
@@ -565,7 +564,7 @@ export default function ReportingPage() {
           </ReportSection>
 
           {/* ── 3. Top risks ─────────────────────────────────────────────── */}
-          <ReportSection borderColor="#C42B31" title="Top 10 risks by residual score">
+          <ReportSection title="Top 10 risks by residual score">
             <TableContainer>
               <Table size="small">
                 <TableHead>
@@ -590,11 +589,8 @@ export default function ReportingPage() {
                         <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: 1.3 }}>{risk.name}</Typography>
                       </TableCell>
                       <TableCell>
-                        <Chip size="small" label={risk.category}
-                          sx={{ height: 18, fontSize: '0.65rem', textTransform: 'capitalize',
-                            bgcolor: `${CATEGORY_COLORS[risk.category]}22`,
-                            color: CATEGORY_COLORS[risk.category],
-                            border: `1px solid ${CATEGORY_COLORS[risk.category]}44` }} />
+                        <Chip size="small" label={risk.category} variant="outlined"
+                          sx={{ height: 18, fontSize: '0.65rem', textTransform: 'capitalize' }} />
                       </TableCell>
                       <TableCell align="center">
                         <Typography variant="body2" sx={{ fontWeight: 600, color: '#94a3b8' }}>{risk.inherent.toFixed(1)}</Typography>
@@ -637,7 +633,7 @@ export default function ReportingPage() {
           </ReportSection>
 
           {/* ── 4. Portfolio trend ───────────────────────────────────────── */}
-          <ReportSection borderColor="#2EB365" title="Portfolio risk trend — Oct 2025 to Mar 2026">
+          <ReportSection title="Portfolio risk trend — Oct 2025 to Mar 2026">
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, md: 8 }}>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1, fontWeight: 600 }}>
@@ -680,7 +676,7 @@ export default function ReportingPage() {
           </ReportSection>
 
           {/* ── 5. KRI evolution ─────────────────────────────────────────── */}
-          <ReportSection borderColor="#C29A1D" title="KRI evolution">
+          <ReportSection title="KRI evolution">
             <TableContainer>
               <Table size="small">
                 <TableHead>
@@ -698,7 +694,7 @@ export default function ReportingPage() {
                       <TableCell><Typography variant="body2" sx={{ fontWeight: 500 }}>{row.kri}</Typography></TableCell>
                       <TableCell align="center"><Typography variant="body2" color="text.secondary">{row.start}</Typography></TableCell>
                       <TableCell align="center">
-                        <Typography variant="body2" sx={{ fontWeight: 700, color: ragColor(row.to) }}>{row.end}</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: scoreColor(row.toScore) }}>{row.end}</Typography>
                       </TableCell>
                       <TableCell align="center">
                         {row.trend === 'up'
@@ -707,9 +703,9 @@ export default function ReportingPage() {
                       </TableCell>
                       <TableCell align="center">
                         <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
-                          <Chip size="small" label={row.from} sx={{ height: 16, fontSize: '0.6rem', bgcolor: `${ragColor(row.from)}22`, color: ragColor(row.from), border: `1px solid ${ragColor(row.from)}44` }} />
+                          <Chip size="small" label={`${row.fromScore}/5`} sx={{ height: 16, fontSize: '0.6rem', bgcolor: `${scoreColor(row.fromScore)}22`, color: scoreColor(row.fromScore), border: `1px solid ${scoreColor(row.fromScore)}44` }} />
                           <Typography variant="caption" color="text.disabled">→</Typography>
-                          <Chip size="small" label={row.to} sx={{ height: 16, fontSize: '0.6rem', bgcolor: `${ragColor(row.to)}22`, color: ragColor(row.to), border: `1px solid ${ragColor(row.to)}44` }} />
+                          <Chip size="small" label={`${row.toScore}/5`} sx={{ height: 16, fontSize: '0.6rem', bgcolor: `${scoreColor(row.toScore)}22`, color: scoreColor(row.toScore), border: `1px solid ${scoreColor(row.toScore)}44` }} />
                         </Stack>
                       </TableCell>
                     </TableRow>
@@ -720,30 +716,30 @@ export default function ReportingPage() {
           </ReportSection>
 
           {/* ── 6. What happened ─────────────────────────────────────────── */}
-          <ReportSection borderColor="#0060C7" title="What happened">
-            <EditableParagraph value={whatHappened} onChange={setWhatHappened} accentColor="#0060C7" />
+          <ReportSection title="What happened">
+            <EditableParagraph value={whatHappened} onChange={setWhatHappened} accentColor="#60a5fa" />
           </ReportSection>
 
           {/* ── 7. Why it happened ───────────────────────────────────────── */}
-          <ReportSection borderColor="#9530DC" title="Root cause analysis">
-            <EditableList value={rootCauses} onChange={setRootCauses} accentColor="#9530DC" />
+          <ReportSection title="Root cause analysis">
+            <EditableList value={rootCauses} onChange={setRootCauses} accentColor="#60a5fa" />
           </ReportSection>
 
           {/* ── 8. Decisions taken ───────────────────────────────────────── */}
-          <ReportSection borderColor="#009999" title="Decisions taken this quarter">
-            <EditableList value={decisions} onChange={setDecisions} accentColor="#009999" />
+          <ReportSection title="Decisions taken this quarter">
+            <EditableList value={decisions} onChange={setDecisions} accentColor="#60a5fa" />
           </ReportSection>
 
           {/* ── 9. Recommendations ───────────────────────────────────────── */}
-          <ReportSection borderColor="#2EB365" title="Recommendations for Q2 2026">
-            <EditableList value={recommendations} onChange={setRecommendations} accentColor="#2EB365" />
+          <ReportSection title="Recommendations for Q2 2026">
+            <EditableList value={recommendations} onChange={setRecommendations} accentColor="#60a5fa" />
           </ReportSection>
         </Paper>
       )}
 
       {/* Report History */}
       <Box>
-        <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Report history</Typography>
+        <Typography variant="h2" component="h2" sx={{ mb: 2 }}>Report history</Typography>
         <TableContainer component={Paper} variant="outlined">
           <Table size="small">
             <TableHead>
@@ -761,10 +757,7 @@ export default function ReportingPage() {
                   <TableCell>{row.type}</TableCell>
                   <TableCell>{row.period}</TableCell>
                   <TableCell>
-                    <Stack direction="row" spacing={0.75} alignItems="center">
-                      {row.generatedBy === 'Agent' && <AutoAwesomeIcon sx={{ fontSize: 14, color: 'primary.main' }} />}
-                      <Typography variant="body2">{row.generatedBy}</Typography>
-                    </Stack>
+                    <Typography variant="body2">{row.generatedBy}</Typography>
                   </TableCell>
                   <TableCell><Typography variant="body2" color="text.secondary">{row.date}</Typography></TableCell>
                   <TableCell align="right">

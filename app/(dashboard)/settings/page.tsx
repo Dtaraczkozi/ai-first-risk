@@ -112,7 +112,7 @@ export default function SettingsPage() {
     <Box>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
         <Box>
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 600 }}>
+          <Typography variant="h1" component="h1">
             Settings
           </Typography>
           <Typography variant="body2" color="text.secondary">
@@ -284,7 +284,7 @@ export default function SettingsPage() {
                 rows={2}
               />
               <Stack direction="row" spacing={1} justifyContent="flex-end">
-                <Button size="small" onClick={() => setIsAddingSource(false)}>
+                <Button size="small" variant="text" onClick={() => setIsAddingSource(false)}>
                   Cancel
                 </Button>
                 <Button size="small" variant="contained" startIcon={<AddIcon />} onClick={addSource} disabled={!newSource.name.trim()}>

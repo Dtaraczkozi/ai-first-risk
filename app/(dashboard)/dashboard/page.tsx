@@ -47,12 +47,13 @@ import type { KeyRiskIndicator } from '@/types/kri';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
-const TASK_TYPE_COLORS: Record<string, string> = {
-  ASSESS:       '#3b82f6',
-  IDENTIFY:     '#9530DC',
-  SUGGEST_CTRL: '#009999',
-  MONITOR:      '#C29A1D',
-  REPORT:       '#0060C7',
+// Task type chips use neutral styling — label alone carries the distinction
+const TASK_TYPE_LABELS: Record<string, string> = {
+  ASSESS:       'Assess',
+  IDENTIFY:     'Identify',
+  SUGGEST_CTRL: 'Suggest control',
+  MONITOR:      'Monitor',
+  REPORT:       'Report',
 };
 
 const PENDING_TASKS = [
@@ -72,6 +73,7 @@ const ACTIVITY_LOG = [
   { type: 'MONITOR',      desc: 'KRI-007 FX Hedge Ratio breach detected',          outcome: 'Auto',     time: '2d ago' },
 ];
 
+// Outcome chips: approved/rejected use semantic color; auto is neutral
 const OUTCOME_COLORS: Record<string, string> = {
   Approved: '#4ade80',
   Rejected: '#f87171',
@@ -190,17 +192,24 @@ function AIChat({ risks, kris }: { risks: RiskSuggestion[]; kris: KeyRiskIndicat
   }
 
   return (
-    <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+    <Paper
+      variant="outlined"
+      sx={{
+        overflow: 'hidden',
+        borderColor: 'rgba(96,165,250,0.25)',
+        boxShadow: '0 0 0 1px rgba(96,165,250,0.08), 0 4px 24px rgba(0,0,0,0.25)',
+      }}
+    >
       {/* Header */}
-      <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 2, py: 1.25, borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+      <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 2, py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.07)', bgcolor: 'rgba(96,165,250,0.04)' }}>
         <Box sx={{
-          width: 26, height: 26, borderRadius: 1,
+          width: 28, height: 28, borderRadius: 1,
           background: 'linear-gradient(135deg,#5C6BC0,#9C27B0,#E91E63)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
         }}>
-          <AgentIcon sx={{ fontSize: 14, color: 'white' }} />
+          <AgentIcon sx={{ fontSize: 15, color: 'white' }} />
         </Box>
-        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Risk Agent</Typography>
+        <Typography variant="h3" component="h2" sx={{ fontWeight: 700 }}>Risk Agent</Typography>
         <Chip size="small" label="Online" icon={<DotIcon sx={{ fontSize: '8px !important', color: '#4ade80 !important' }} />}
           sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'rgba(74,222,128,0.08)', color: '#4ade80', border: '1px solid rgba(74,222,128,0.2)', '& .MuiChip-icon': { ml: 0.75 } }} />
         <Box sx={{ flex: 1 }} />
@@ -334,33 +343,39 @@ function QuickStats({ approvedRisks, draftRisks, kris }: { approvedRisks: RiskSu
   const kriBreaches    = kris.filter(k => k.status === 'red').length;
 
   const stats = [
-    { label: 'Total risks',     value: totalApproved,   subtitle: 'In register',        color: '#60a5fa', href: '/risks',       Icon: ShieldIcon },
-    { label: 'High severity',   value: highSeverity,    subtitle: 'Score 4–5',           color: '#f87171', href: '/risks',       Icon: WarningIcon },
-    { label: 'Unassessed',      value: unassessed,      subtitle: 'Need assessment',     color: '#fbbf24', href: '/assessments', Icon: AssessmentIcon },
-    { label: 'KRI breaches',    value: kriBreaches,     subtitle: 'Red threshold',       color: kriBreaches > 0 ? '#f87171' : '#4ade80', href: '/kris', Icon: TrendingUpIcon },
-    { label: 'Pending review',  value: draftRisks.length, subtitle: 'Draft risks',       color: '#a78bfa', href: '/',            Icon: CheckIcon },
-    { label: 'Agent actions',   value: PENDING_TASKS.length, subtitle: 'Awaiting approval', color: '#34d399', href: '/assessments', Icon: AgentIcon },
+    { label: 'Total risks',     value: totalApproved,         subtitle: 'In register',         severity: null,                      href: '/risks',       Icon: ShieldIcon },
+    { label: 'High severity',   value: highSeverity,          subtitle: 'Score 4–5',            severity: highSeverity > 0 ? 'high' as const : null, href: '/risks', Icon: WarningIcon },
+    { label: 'Unassessed',      value: unassessed,            subtitle: 'Need assessment',      severity: unassessed > 0 ? 'med' as const : null,   href: '/assessments', Icon: AssessmentIcon },
+    { label: 'KRI breaches',    value: kriBreaches,           subtitle: 'Threshold breached',   severity: kriBreaches > 0 ? 'high' as const : null, href: '/kris', Icon: TrendingUpIcon },
+    { label: 'Pending review',  value: draftRisks.length,     subtitle: 'Draft risks',          severity: null,                      href: '/',            Icon: CheckIcon },
+    { label: 'Agent actions',   value: PENDING_TASKS.length,  subtitle: 'Awaiting approval',    severity: null,                      href: '/assessments', Icon: AgentIcon },
   ];
+
+  const severityColor = (s: 'high' | 'med' | null) =>
+    s === 'high' ? '#f87171' : s === 'med' ? '#fbbf24' : '#60a5fa';
 
   return (
     <Grid container spacing={1.5}>
-      {stats.map((stat) => (
-        <Grid key={stat.label} size={{ xs: 6, sm: 4, md: 2 }}>
-          <Paper
-            component={Link}
-            href={stat.href}
-            variant="outlined"
-            sx={{ p: 1.5, height: '100%', display: 'block', textDecoration: 'none', cursor: 'pointer', transition: 'all 0.15s', '&:hover': { bgcolor: 'rgba(255,255,255,0.025)', borderColor: 'rgba(255,255,255,0.15)' } }}
-          >
-            <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.5 }}>
-              <stat.Icon sx={{ fontSize: 13, color: stat.color, opacity: 0.8 }} />
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>{stat.label}</Typography>
-            </Stack>
-            <Typography variant="h5" sx={{ fontWeight: 700, color: stat.color, lineHeight: 1.1 }}>{stat.value}</Typography>
-            <Typography variant="caption" color="text.disabled">{stat.subtitle}</Typography>
-          </Paper>
-        </Grid>
-      ))}
+      {stats.map((stat) => {
+        const color = severityColor(stat.severity);
+        return (
+          <Grid key={stat.label} size={{ xs: 6, sm: 4, md: 2 }}>
+            <Paper
+              component={Link}
+              href={stat.href}
+              variant="outlined"
+              sx={{ p: 1.5, height: '100%', display: 'block', textDecoration: 'none', cursor: 'pointer', transition: 'all 0.15s', '&:hover': { bgcolor: 'rgba(255,255,255,0.025)', borderColor: 'rgba(255,255,255,0.15)' } }}
+            >
+              <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.5 }}>
+                <stat.Icon sx={{ fontSize: 13, color: 'text.disabled', opacity: 0.8 }} />
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>{stat.label}</Typography>
+              </Stack>
+              <Typography variant="h5" sx={{ fontWeight: 700, color, lineHeight: 1.1 }}>{stat.value}</Typography>
+              <Typography variant="caption" color="text.disabled">{stat.subtitle}</Typography>
+            </Paper>
+          </Grid>
+        );
+      })}
     </Grid>
   );
 }
@@ -437,18 +452,19 @@ function AgentQueuePanel({ onApprove }: { onApprove: () => void }) {
           sx={{ p: 2.5, borderRight: { md: '1px solid' }, borderColor: { md: 'divider' }, borderBottom: { xs: '1px solid', md: 'none' }, borderBottomColor: { xs: 'divider' } }}
         >
           <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Pending approvals</Typography>
+            <Typography variant="h3" component="h3">Pending approvals</Typography>
             <Chip size="small" label={PENDING_TASKS.length}
-              sx={{ height: 18, fontSize: '0.65rem', fontWeight: 700, bgcolor: 'rgba(248,113,113,0.1)', color: '#f87171', border: '1px solid rgba(248,113,113,0.25)' }} />
+              variant="outlined"
+              sx={{ height: 18, fontSize: '0.65rem', fontWeight: 700 }} />
           </Stack>
           <Stack spacing={1}>
             {PENDING_TASKS.map((task, idx) => {
-              const color = TASK_TYPE_COLORS[task.type];
               return (
                 <Stack key={idx} direction="row" spacing={1} alignItems="center"
                   sx={{ py: 0.75, px: 1, borderRadius: 1, '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' } }}>
-                  <Chip size="small" label={task.type}
-                    sx={{ height: 18, bgcolor: `${color}1a`, color, border: `1px solid ${color}44`, fontWeight: 700, fontSize: '0.6rem', flexShrink: 0, '& .MuiChip-label': { px: 0.75 } }} />
+                  <Chip size="small" label={TASK_TYPE_LABELS[task.type] ?? task.type}
+                    variant="outlined"
+                    sx={{ height: 18, fontWeight: 600, fontSize: '0.6rem', flexShrink: 0, '& .MuiChip-label': { px: 0.75 } }} />
                   <Typography variant="body2" sx={{ flex: 1, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.82rem' }}>
                     {task.title}
                   </Typography>
@@ -473,16 +489,16 @@ function AgentQueuePanel({ onApprove }: { onApprove: () => void }) {
 
         {/* Recent agent activity */}
         <Grid size={{ xs: 12, md: 5 }} sx={{ p: 2.5 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2 }}>Recent agent activity</Typography>
+          <Typography variant="h3" component="h3" sx={{ mb: 2 }}>Recent agent activity</Typography>
           <Stack spacing={1}>
             {ACTIVITY_LOG.map((item, idx) => {
-              const color = TASK_TYPE_COLORS[item.type];
               const oc = OUTCOME_COLORS[item.outcome];
               return (
                 <Stack key={idx} direction="row" spacing={0.75} alignItems="flex-start"
                   sx={{ py: 0.5, borderBottom: idx < ACTIVITY_LOG.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-                  <Chip size="small" label={item.type}
-                    sx={{ height: 16, bgcolor: `${color}1a`, color, border: `1px solid ${color}44`, fontWeight: 700, fontSize: '0.58rem', flexShrink: 0, mt: 0.2, '& .MuiChip-label': { px: 0.6 } }} />
+                  <Chip size="small" label={TASK_TYPE_LABELS[item.type] ?? item.type}
+                    variant="outlined"
+                    sx={{ height: 16, fontSize: '0.58rem', flexShrink: 0, mt: 0.2, '& .MuiChip-label': { px: 0.6 } }} />
                   <Typography variant="caption" sx={{ flex: 1, lineHeight: 1.45, fontSize: '0.78rem' }}>{item.desc}</Typography>
                   <Chip size="small" label={item.outcome} variant="outlined"
                     sx={{ height: 16, fontSize: '0.58rem', color: oc, borderColor: oc, flexShrink: 0, '& .MuiChip-label': { px: 0.6 } }} />
@@ -525,8 +541,7 @@ function TopPriorityRisks({ risks }: { risks: RiskSuggestion[] }) {
   return (
     <Paper variant="outlined" sx={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 2, py: 1.25, borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
-        <WarningIcon sx={{ fontSize: 14, color: '#f87171' }} />
-        <Typography variant="subtitle2" sx={{ fontWeight: 700, flex: 1 }}>Priority risks</Typography>
+        <Typography variant="h3" component="h3" sx={{ flex: 1 }}>Priority risks</Typography>
         <Chip size="small" label={`${risks.filter(r => (r.likelihood + r.impact) / 2 >= 4).length} critical`}
           sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'rgba(248,113,113,0.1)', color: '#f87171', border: '1px solid rgba(248,113,113,0.25)' }} />
         <Button component={Link} href="/risks" size="small" variant="text"
@@ -733,12 +748,12 @@ export default function DashboardPage() {
     <Box sx={{ p: 3 }}>
       {/* ── Header ── */}
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2.5 }}>
-        <Typography variant="h4" component="h1" sx={{ fontWeight: 600 }}>Dashboard</Typography>
+        <Typography variant="h1" component="h1">Dashboard</Typography>
         <Stack direction="row" spacing={1}>
-          <Button component={Link} href="/reporting" variant="outlined" size="small" startIcon={<ReportIcon sx={{ fontSize: '14px !important' }} />}>
+          <Button component={Link} href="/reporting" variant="text" size="small" startIcon={<ReportIcon sx={{ fontSize: '14px !important' }} />}>
             Reports
           </Button>
-          <Button component={Link} href="/reporting" variant="contained" size="small" startIcon={<AgentIcon sx={{ fontSize: '14px !important' }} />}>
+          <Button component={Link} href="/reporting" variant="contained" size="small" startIcon={<ReportIcon sx={{ fontSize: '14px !important' }} />}>
             New report
           </Button>
         </Stack>
@@ -809,16 +824,10 @@ export default function DashboardPage() {
       {/* ── Agent queue ── */}
       <Box sx={{ mb: 2.5 }}>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.25 }}>
-          <Box sx={{
-            width: 22, height: 22, borderRadius: 0.75,
-            background: 'linear-gradient(135deg,#5C6BC0,#9C27B0,#E91E63)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <AgentIcon sx={{ fontSize: 12, color: 'white' }} />
-          </Box>
-          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Agent queue</Typography>
+          <Typography variant="h2" component="h2">Agent queue</Typography>
           <Chip size="small" label={`${PENDING_TASKS.length} pending`}
-            sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'rgba(251,191,36,0.08)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.2)' }} />
+            variant="outlined"
+            sx={{ height: 18, fontSize: '0.65rem' }} />
         </Stack>
         <AgentQueuePanel onApprove={() => setApproveSnackbar(true)} />
       </Box>

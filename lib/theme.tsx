@@ -56,22 +56,18 @@ const theme = createTheme({
   },
   typography: {
     fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-    h1: {
-      fontSize: '2.5rem',
-      fontWeight: 600,
-    },
-    h2: {
-      fontSize: '2rem',
-      fontWeight: 600,
-    },
-    h3: {
-      fontSize: '1.5rem',
-      fontWeight: 600,
-    },
-    h4: {
-      fontSize: '1.25rem',
-      fontWeight: 600,
-    },
+    // Heading scale: h1 = page title, h2 = section, h3 = sub-section, h4 = group label
+    h1: { fontSize: '24px', fontWeight: 600, lineHeight: 1.3 },
+    h2: { fontSize: '20px', fontWeight: 600, lineHeight: 1.35 },
+    h3: { fontSize: '16px', fontWeight: 600, lineHeight: 1.4 },
+    h4: { fontSize: '14px', fontWeight: 600, lineHeight: 1.4 },
+    h5: { fontSize: '14px', fontWeight: 500, lineHeight: 1.4 },
+    h6: { fontSize: '13px', fontWeight: 500, lineHeight: 1.4 },
+    body1: { fontSize: '14px', lineHeight: 1.6 },
+    body2: { fontSize: '14px', lineHeight: 1.6 },
+    caption: { fontSize: '12px', lineHeight: 1.5 },
+    subtitle1: { fontSize: '14px', fontWeight: 500 },
+    subtitle2: { fontSize: '13px', fontWeight: 600 },
   },
   shape: {
     borderRadius: 10,
@@ -119,26 +115,25 @@ const theme = createTheme({
           borderRadius: 8,
           whiteSpace: 'nowrap',
         },
-        // ── Primary: filled gradient, white text (WCAG: #2563eb ≥4.95:1 with #fff) ──
+        // ── Primary: solid blue, white text — purposeful, not decorative ──
         contained: {
-          background: 'linear-gradient(135deg, #2563eb 0%, #4f46e5 100%)',
+          background: '#2563eb',
           color: '#ffffff',
-          boxShadow: '0 2px 8px rgba(37,99,235,0.35)',
+          boxShadow: 'none',
           '&:hover': {
-            background: 'linear-gradient(135deg, #1d4ed8 0%, #4338ca 100%)',
-            boxShadow: '0 4px 16px rgba(37,99,235,0.5)',
+            background: '#1d4ed8',
+            boxShadow: '0 2px 8px rgba(37,99,235,0.35)',
           },
           '&:active': {
-            background: 'linear-gradient(135deg, #1e40af 0%, #3730a3 100%)',
-            boxShadow: '0 1px 4px rgba(37,99,235,0.2)',
+            background: '#1e40af',
+            boxShadow: 'none',
           },
-          // Override any colour-specific contained variants back to white
           '&.MuiButton-containedError': {
-            background: 'linear-gradient(135deg, #b91c1c 0%, #991b1b 100%)',
-            boxShadow: '0 2px 8px rgba(185,28,28,0.4)',
+            background: '#b91c1c',
+            boxShadow: 'none',
             '&:hover': {
-              background: 'linear-gradient(135deg, #991b1c 0%, #7f1d1d 100%)',
-              boxShadow: '0 4px 16px rgba(185,28,28,0.55)',
+              background: '#991b1b',
+              boxShadow: '0 2px 8px rgba(185,28,28,0.35)',
             },
           },
         },

@@ -15,6 +15,8 @@ import {
   Typography,
   Divider,
   Badge,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import {
   Shield as ShieldIcon,
@@ -67,6 +69,7 @@ export function Sidebar({ pendingApprovals = 0 }: SidebarProps) {
   const pathname = usePathname();
   const isSettingsArea = pathname?.startsWith('/settings');
   const [settingsOpen, setSettingsOpen] = useState(isSettingsArea);
+  const [comingSoonOpen, setComingSoonOpen] = useState(false);
 
   const mainNavItems: NavItem[] = [
     { href: '/dashboard',   label: 'Dashboard',            icon: <DashboardIcon /> },
@@ -184,22 +187,21 @@ export function Sidebar({ pendingApprovals = 0 }: SidebarProps) {
               const inner = (
                 <ListItemButton
                   selected={isActive}
-                  disabled={!sub.href}
-                  {...(sub.href ? { component: Link, href: sub.href } : {})}
+                  {...(sub.href ? { component: Link, href: sub.href } : { onClick: () => setComingSoonOpen(true) })}
                   sx={{
                     borderRadius: 1,
                     py: 0.65,
                     pl: 1.25,
                     minHeight: 32,
+                    cursor: 'pointer',
                     '&.Mui-selected': {
                       background: 'rgba(96, 165, 250, 0.15)',
                       '& .MuiListItemIcon-root': { color: '#60a5fa' },
                       '& .MuiListItemText-primary': { color: '#93c5fd', fontWeight: 600 },
                     },
-                    '&:not(.Mui-selected):not(.Mui-disabled):hover': {
+                    '&:not(.Mui-selected):hover': {
                       background: 'rgba(96, 165, 250, 0.06)',
                     },
-                    '&.Mui-disabled': { opacity: 0.45 },
                     '& .MuiListItemIcon-root': { color: '#64748b' },
                   }}
                 >
@@ -224,6 +226,17 @@ export function Sidebar({ pendingApprovals = 0 }: SidebarProps) {
           </List>
         </Collapse>
       </List>
+
+      <Snackbar
+        open={comingSoonOpen}
+        autoHideDuration={3000}
+        onClose={() => setComingSoonOpen(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="info" onClose={() => setComingSoonOpen(false)} aria-live="polite">
+          Coming soon
+        </Alert>
+      </Snackbar>
     </Drawer>
   );
 }

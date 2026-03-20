@@ -74,7 +74,7 @@ export function RiskForm({ open, risk, onClose, onSave }: RiskFormProps) {
         <DialogTitle component="div" sx={{ pb: 1 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Typography variant="h6" component="h2">
-              {isEdit ? 'Edit Risk' : 'Add New Risk'}
+              {isEdit ? 'Edit risk' : 'Add new risk'}
             </Typography>
             <IconButton onClick={onClose} size="small">
               <CloseIcon />
@@ -151,7 +151,7 @@ export function RiskForm({ open, risk, onClose, onSave }: RiskFormProps) {
 
             <Grid size={12}>
               <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
-                Risk Assessment
+                Risk assessment
               </Typography>
             </Grid>
 
@@ -168,8 +168,8 @@ export function RiskForm({ open, risk, onClose, onSave }: RiskFormProps) {
                 onChange={(_, value) => setFormData({ ...formData, severity: value as 1 | 2 | 3 | 4 | 5 })}
               />
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography variant="caption" color="text.secondary">Low</Typography>
-                <Typography variant="caption" color="text.secondary">Critical</Typography>
+                <Typography variant="caption" color="text.secondary">1 — Very low</Typography>
+                <Typography variant="caption" color="text.secondary">5 — Critical</Typography>
               </Box>
             </Grid>
 
@@ -212,7 +212,7 @@ export function RiskForm({ open, risk, onClose, onSave }: RiskFormProps) {
         </DialogContent>
 
         <DialogActions sx={{ px: 3, pb: 3 }}>
-          <Button variant="outlined" onClick={onClose}>
+          <Button variant="text" onClick={onClose}>
             Cancel
           </Button>
           <Button variant="contained" startIcon={isEdit ? <SaveIcon /> : <AddIcon />} type="submit">

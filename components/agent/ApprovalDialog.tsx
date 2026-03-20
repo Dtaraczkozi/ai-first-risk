@@ -139,7 +139,7 @@ export function ApprovalDialog({ open, request, action, onClose, onConfirm }: Ap
           fullWidth
           multiline
           rows={3}
-          label={isApprove ? 'Approval Notes (Optional)' : 'Rejection Reason (Optional)'}
+          label={isApprove ? 'Approval notes (optional)' : 'Rejection reason (optional)'}
           placeholder={isApprove 
             ? 'Add any notes for this approval...'
             : 'Explain why this action is being rejected...'
@@ -151,7 +151,7 @@ export function ApprovalDialog({ open, request, action, onClose, onConfirm }: Ap
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 3 }}>
-        <Button variant="outlined" onClick={handleClose}>
+        <Button variant="text" onClick={handleClose}>
           Cancel
         </Button>
         <Button

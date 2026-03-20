@@ -140,7 +140,8 @@ const RESULTS_BY_CATEGORY: Record<string, number> = {
 
 const SCORE_LABEL: Record<number, string> = { 1: 'Very low', 2: 'Low', 3: 'Medium', 4: 'High', 5: 'Very high' };
 const SCORE_COLOR: Record<number, string> = { 1: '#4ade80', 2: '#86efac', 3: '#fbbf24', 4: '#f97316', 5: '#f87171' };
-const CONF_COLOR: Record<string, string> = { high: '#4ade80', medium: '#fbbf24', low: '#f87171' };
+// Confidence is metadata — neutral, not colored
+const CONF_COLOR: Record<string, string> = { high: '#94a3b8', medium: '#94a3b8', low: '#94a3b8' };
 
 interface Recommendation {
   id: string;
@@ -743,7 +744,7 @@ export default function AssessmentsPage() {
       <Box sx={{ flex: 1, minWidth: 0, pl: detailGroup ? 2 : 0, pr: detailGroup ? 2 : 0, transition: 'padding 0.2s ease' }}>
 
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2.5 }}>
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 600 }}>
+          <Typography variant="h1" component="h1">
             Assessments
           </Typography>
         </Stack>
@@ -1079,9 +1080,7 @@ export default function AssessmentsPage() {
                             {rec.affectedCategory && (
                               <Chip size="small" label={rec.affectedCategory.charAt(0).toUpperCase() + rec.affectedCategory.slice(1)}
                                 sx={{ height: 20, fontSize: '0.68rem',
-                                  bgcolor: `${categoryColors[rec.affectedCategory] || '#6B7280'}18`,
-                                  color: categoryColors[rec.affectedCategory] || 'text.secondary',
-                                  border: `1px solid ${categoryColors[rec.affectedCategory] || '#6B7280'}40` }} />
+                                }} />
                             )}
                           </Stack>
                         </Box>
@@ -1122,9 +1121,7 @@ export default function AssessmentsPage() {
                                           label={risk.category.charAt(0).toUpperCase() + risk.category.slice(1)}
                                           sx={{
                                             height: 18, fontSize: '0.65rem', flexShrink: 0,
-                                            bgcolor: `${categoryColors[risk.category] || '#6B7280'}18`,
-                                            color: categoryColors[risk.category] || 'text.secondary',
-                                            border: `1px solid ${categoryColors[risk.category] || '#6B7280'}35`,
+                                            
                                           }}
                                         />
                                         <Typography variant="body2" sx={{ fontWeight: 500 }}>{risk.title}</Typography>
@@ -1300,20 +1297,20 @@ export default function AssessmentsPage() {
                                   <Box sx={{ flex: 1, minWidth: 0 }}>
                                     <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ gap: 0.5 }}>
                                       <Typography variant="caption" sx={{ fontFamily: 'monospace', fontWeight: 700, color: 'text.disabled', flexShrink: 0 }}>{getRiskDisplayId(risk.id, risks)}</Typography>
-                                      <Chip size="small" label={risk.category.charAt(0).toUpperCase() + risk.category.slice(1)} sx={{ height: 18, fontSize: '0.65rem', bgcolor: `${(categoryColors[risk.category] as string | undefined) || '#6B7280'}18`, color: (categoryColors[risk.category] as string | undefined) || 'text.secondary', border: `1px solid ${(categoryColors[risk.category] as string | undefined) || '#6B7280'}35` }} />
+                                      <Chip size="small" label={risk.category.charAt(0).toUpperCase() + risk.category.slice(1)} variant="outlined" sx={{ height: 18, fontSize: '0.65rem' }} />
                                       <Typography variant="body2" sx={{ fontWeight: 500 }}>{risk.title}</Typography>
-                                      {hasDraft && <Chip size="small" label="AGENT DRAFTED" sx={{ height: 17, fontSize: '0.62rem', fontWeight: 700, bgcolor: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.3)', flexShrink: 0 }} />}
+                                      {hasDraft && <Chip size="small" label="Agent drafted" variant="outlined" sx={{ height: 17, fontSize: '0.62rem', fontWeight: 600, flexShrink: 0 }} />}
                                     </Stack>
                                     <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.25 }}>
                                       <Stack direction="row" spacing={0.5} alignItems="center">
                                         <Box sx={{ width: 8, height: 8, borderRadius: 0.5, bgcolor: getScoreColor(risk), flexShrink: 0 }} />
                                         <Typography variant="caption" color="text.secondary">{getScoreLabel(risk)}</Typography>
                                       </Stack>
-                                      {inQueue && <Typography variant="caption" sx={{ color: hasDraft ? '#f87171' : 'text.disabled' }}>{hasDraft ? 'KRI signal: RED' : '90d unassessed'}</Typography>}
+                                      {inQueue && <Typography variant="caption" sx={{ color: hasDraft ? '#f87171' : 'text.disabled' }}>{hasDraft ? 'KRI signal: high' : '90d unassessed'}</Typography>}
                                     </Stack>
                                   </Box>
                                   <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }}>
-                                    {inQueue ? (<><Button size="small" variant="outlined" onClick={() => openDraft(risk, queueIdx)}>Review draft</Button><Button size="small" variant="contained" startIcon={<CheckIcon />} onClick={() => setSnackMessage('Assessment approved')}>Approve</Button><Button size="small" variant="text" sx={{ color: 'text.secondary' }} onClick={() => { setDeferredRiskIds(prev => new Set([...prev, risk.id])); setSnackMessage('Deferred'); }}>Defer</Button></>) : (<Button size="small" variant="outlined" startIcon={<PlayArrowIcon />} onClick={() => setSnackMessage('Assessment started')}>Assess</Button>)}
+                                    {inQueue ? (<><Button size="small" variant="text" sx={{ color: 'text.secondary' }} onClick={() => { setDeferredRiskIds(prev => new Set([...prev, risk.id])); setSnackMessage('Deferred'); }}>Defer</Button><Button size="small" variant="outlined" onClick={() => openDraft(risk, queueIdx)}>Review draft</Button><Button size="small" variant="contained" startIcon={<CheckIcon />} onClick={() => setSnackMessage('Assessment approved')}>Approve</Button></>) : (<Button size="small" variant="contained" startIcon={<PlayArrowIcon />} onClick={() => setSnackMessage('Assessment started')}>Assess</Button>)}
                                   </Stack>
                                 </Stack>
                               </Box>
@@ -1361,16 +1358,16 @@ export default function AssessmentsPage() {
                                   <Box sx={{ flex: 1, minWidth: 0 }}>
                                     <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ gap: 0.5 }}>
                                       <Typography variant="caption" sx={{ fontFamily: 'monospace', fontWeight: 700, color: 'text.disabled', flexShrink: 0 }}>{getRiskDisplayId(risk.id, risks)}</Typography>
-                                      <Chip size="small" label={risk.category.charAt(0).toUpperCase() + risk.category.slice(1)} sx={{ height: 18, fontSize: '0.65rem', bgcolor: `${(categoryColors[risk.category] as string | undefined) || '#6B7280'}18`, color: (categoryColors[risk.category] as string | undefined) || 'text.secondary', border: `1px solid ${(categoryColors[risk.category] as string | undefined) || '#6B7280'}35` }} />
+                                      <Chip size="small" label={risk.category.charAt(0).toUpperCase() + risk.category.slice(1)} variant="outlined" sx={{ height: 18, fontSize: '0.65rem' }} />
                                       <Typography variant="body2" sx={{ fontWeight: 500 }}>{risk.title}</Typography>
-                                      {hasDraft && <Chip size="small" label="AGENT DRAFTED" sx={{ height: 17, fontSize: '0.62rem', fontWeight: 700, bgcolor: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.3)', flexShrink: 0 }} />}
+                                      {hasDraft && <Chip size="small" label="Agent drafted" variant="outlined" sx={{ height: 17, fontSize: '0.62rem', fontWeight: 600, flexShrink: 0 }} />}
                                     </Stack>
                                     <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.25 }}>
                                       <Stack direction="row" spacing={0.5} alignItems="center">
                                         <Box sx={{ width: 8, height: 8, borderRadius: 0.5, bgcolor: getScoreColor(risk), flexShrink: 0 }} />
                                         <Typography variant="caption" color="text.secondary">{getScoreLabel(risk)}</Typography>
                                       </Stack>
-                                      {inQueue && <Typography variant="caption" sx={{ color: hasDraft ? '#f87171' : 'text.disabled' }}>{hasDraft ? 'KRI signal: RED' : '90d unassessed'}</Typography>}
+                                      {inQueue && <Typography variant="caption" sx={{ color: hasDraft ? '#f87171' : 'text.disabled' }}>{hasDraft ? 'KRI signal: high' : '90d unassessed'}</Typography>}
                                       {risk.suggestedOwner && <Stack direction="row" spacing={0.5} alignItems="center"><Avatar sx={{ width: 16, height: 16, fontSize: '0.55rem', bgcolor: ownerColors[risk.suggestedOwner.name] || '#6B7280' }}>{risk.suggestedOwner.name.split(' ').map(n => n[0]).join('')}</Avatar><Typography variant="caption" color="text.secondary">{risk.suggestedOwner.name}</Typography></Stack>}
                                     </Stack>
                                   </Box>
@@ -1399,7 +1396,7 @@ export default function AssessmentsPage() {
             {/* Header row */}
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2.5, flexWrap: 'wrap', gap: 1 }}>
               <Stack direction="row" spacing={2} alignItems="center">
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>AI assessors</Typography>
+                <Typography variant="h3" component="h2">AI assessors</Typography>
                 <Typography variant="body2" color="text.secondary">
                   {personas.filter(p => p.active).length} active personas
                 </Typography>
@@ -2268,7 +2265,7 @@ export default function AssessmentsPage() {
           <Box sx={{ height: '100%', overflowY: 'auto', pb: 4 }}>
             {/* Drawer header */}
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>Review assessment draft</Typography>
+              <Typography variant="h3" component="h2">Review assessment draft</Typography>
               <IconButton size="small" onClick={() => setDraftRisk(null)}><CloseIcon /></IconButton>
             </Stack>
 
@@ -2404,8 +2401,6 @@ export default function AssessmentsPage() {
                           label={opinion.confidence}
                           sx={{
                             height: 18, fontSize: '0.65rem',
-                            bgcolor: opinion.confidence === 'high' ? 'rgba(76,175,80,0.12)' : opinion.confidence === 'medium' ? 'rgba(255,152,0,0.12)' : 'rgba(244,67,54,0.12)',
-                            color: opinion.confidence === 'high' ? '#4caf50' : opinion.confidence === 'medium' ? '#ff9800' : '#f44336',
                           }}
                         />
                       </TableCell>

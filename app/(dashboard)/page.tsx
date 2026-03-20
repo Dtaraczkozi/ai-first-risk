@@ -184,6 +184,11 @@ const MOCK_SIGNALS: Record<'competitor' | 'news' | 'regulatory', Signal[]> = {
 
 const categoryColors = RISK_CATEGORY_COLORS;
 
+// Relevance is metadata, not severity — use neutral chip styling
+function relevanceChipSx(_relevance: string) {
+  return {};
+}
+
 const sourceTypeLabels: Record<string, string> = {
   document: 'Internal',
   competitor: 'Competitor',
@@ -306,7 +311,7 @@ function AddRiskSideSheet({ open, onClose, onSave }: AddRiskSideSheetProps) {
       }}
     >
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+        <Typography variant="h2" component="h2">
           Add risk manually
         </Typography>
         <IconButton onClick={handleClose} size="small">
@@ -427,7 +432,7 @@ function RiskSummaryStats({ suggestions, approvedCount }: { suggestions: RiskSug
       <Grid container spacing={2}>
         <Grid size={{ xs: 6, sm: 3 }}>
           <Paper sx={{ p: 3, height: 96, display: 'flex', flexDirection: 'column', justifyContent: 'center' }} variant="outlined">
-            <Typography variant="h4" sx={{ fontWeight: 700, lineHeight: 1, color: '#1976d2' }}>
+            <Typography variant="h2" sx={{ lineHeight: 1 }}>
               {totalIdentified}
             </Typography>
             <Typography variant="caption" color="text.secondary">
@@ -437,7 +442,7 @@ function RiskSummaryStats({ suggestions, approvedCount }: { suggestions: RiskSug
         </Grid>
         <Grid size={{ xs: 6, sm: 3 }}>
           <Paper sx={{ p: 3, height: 96, display: 'flex', flexDirection: 'column', justifyContent: 'center' }} variant="outlined">
-            <Typography variant="h4" sx={{ fontWeight: 700, lineHeight: 1, color: '#ed6c02' }}>
+            <Typography variant="h2" sx={{ lineHeight: 1 }}>
               {pendingCount}
             </Typography>
             <Typography variant="caption" color="text.secondary">
@@ -447,7 +452,7 @@ function RiskSummaryStats({ suggestions, approvedCount }: { suggestions: RiskSug
         </Grid>
         <Grid size={{ xs: 6, sm: 3 }}>
           <Paper sx={{ p: 3, height: 96, display: 'flex', flexDirection: 'column', justifyContent: 'center' }} variant="outlined">
-            <Typography variant="h4" sx={{ fontWeight: 700, lineHeight: 1, color: '#2e7d32' }}>
+            <Typography variant="h2" sx={{ lineHeight: 1 }}>
               {approvedCount}
             </Typography>
             <Typography variant="caption" color="text.secondary">
@@ -457,11 +462,11 @@ function RiskSummaryStats({ suggestions, approvedCount }: { suggestions: RiskSug
         </Grid>
         <Grid size={{ xs: 6, sm: 3 }}>
           <Paper sx={{ p: 3, height: 96, display: 'flex', flexDirection: 'column', justifyContent: 'center' }} variant="outlined">
-            <Typography variant="h4" sx={{ fontWeight: 700, lineHeight: 1, color: '#9e9e9e' }}>
+            <Typography variant="h2" sx={{ lineHeight: 1, color: highSeverityCount > 0 ? '#f87171' : undefined }}>
               {highSeverityCount}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              High Severity
+              High severity
             </Typography>
           </Paper>
         </Grid>
@@ -925,10 +930,17 @@ function RiskDiscoveryContent() {
 
       {/* Header - always visible */}
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-        <Typography variant="h4" component="h1" sx={{ fontWeight: 600 }}>
-          Risk Discovery
+        <Typography variant="h1" component="h1">
+          Risk discovery
         </Typography>
         <Stack direction="row" spacing={1}>
+          <Button
+            variant="outlined"
+            startIcon={<AddIcon />}
+            onClick={() => setSideSheetOpen(true)}
+          >
+            Add manually
+          </Button>
           <Button
             variant="contained"
             startIcon={<AgentIcon />}
@@ -936,13 +948,6 @@ function RiskDiscoveryContent() {
             disabled={isProcessing || showUploadUI}
           >
             New identification
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<AddIcon />}
-            onClick={() => setSideSheetOpen(true)}
-          >
-            Add manually
           </Button>
         </Stack>
       </Stack>
@@ -1264,8 +1269,7 @@ function RiskDiscoveryContent() {
                                   height: 18,
                                   fontSize: '0.68rem',
                                   flexShrink: 0,
-                                  bgcolor: signal.relevance === 'high' ? 'rgba(196,43,49,0.15)' : signal.relevance === 'medium' ? 'rgba(194,154,29,0.15)' : 'rgba(148,163,184,0.15)',
-                                  color: signal.relevance === 'high' ? '#E54E54' : signal.relevance === 'medium' ? '#C29A1D' : '#94a3b8',
+                                  ...relevanceChipSx(signal.relevance),
                                   border: `1px solid ${signal.relevance === 'high' ? 'rgba(196,43,49,0.3)' : signal.relevance === 'medium' ? 'rgba(194,154,29,0.3)' : 'rgba(148,163,184,0.3)'}`,
                                 }}
                               />
@@ -1283,9 +1287,6 @@ function RiskDiscoveryContent() {
                                     sx={{
                                       height: 16,
                                       fontSize: '0.65rem',
-                                      bgcolor: `${categoryColors[cat]}22`,
-                                      color: categoryColors[cat],
-                                      border: `1px solid ${categoryColors[cat]}44`,
                                     }}
                                   />
                                 ))}
@@ -1340,8 +1341,7 @@ function RiskDiscoveryContent() {
                                   height: 18,
                                   fontSize: '0.68rem',
                                   flexShrink: 0,
-                                  bgcolor: signal.relevance === 'high' ? 'rgba(196,43,49,0.15)' : signal.relevance === 'medium' ? 'rgba(194,154,29,0.15)' : 'rgba(148,163,184,0.15)',
-                                  color: signal.relevance === 'high' ? '#E54E54' : signal.relevance === 'medium' ? '#C29A1D' : '#94a3b8',
+                                  ...relevanceChipSx(signal.relevance),
                                   border: `1px solid ${signal.relevance === 'high' ? 'rgba(196,43,49,0.3)' : signal.relevance === 'medium' ? 'rgba(194,154,29,0.3)' : 'rgba(148,163,184,0.3)'}`,
                                 }}
                               />
@@ -1359,9 +1359,6 @@ function RiskDiscoveryContent() {
                                     sx={{
                                       height: 16,
                                       fontSize: '0.65rem',
-                                      bgcolor: `${categoryColors[cat]}22`,
-                                      color: categoryColors[cat],
-                                      border: `1px solid ${categoryColors[cat]}44`,
                                     }}
                                   />
                                 ))}
@@ -1416,8 +1413,7 @@ function RiskDiscoveryContent() {
                                   height: 18,
                                   fontSize: '0.68rem',
                                   flexShrink: 0,
-                                  bgcolor: signal.relevance === 'high' ? 'rgba(196,43,49,0.15)' : signal.relevance === 'medium' ? 'rgba(194,154,29,0.15)' : 'rgba(148,163,184,0.15)',
-                                  color: signal.relevance === 'high' ? '#E54E54' : signal.relevance === 'medium' ? '#C29A1D' : '#94a3b8',
+                                  ...relevanceChipSx(signal.relevance),
                                   border: `1px solid ${signal.relevance === 'high' ? 'rgba(196,43,49,0.3)' : signal.relevance === 'medium' ? 'rgba(194,154,29,0.3)' : 'rgba(148,163,184,0.3)'}`,
                                 }}
                               />
@@ -1435,9 +1431,6 @@ function RiskDiscoveryContent() {
                                     sx={{
                                       height: 16,
                                       fontSize: '0.65rem',
-                                      bgcolor: `${categoryColors[cat]}22`,
-                                      color: categoryColors[cat],
-                                      border: `1px solid ${categoryColors[cat]}44`,
                                     }}
                                   />
                                 ))}
@@ -1468,7 +1461,7 @@ function RiskDiscoveryContent() {
             {/* Risk Suggestions Section */}
             <Box ref={tableRef}>
               <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5, mt: 1 }}>
-                <Typography variant="h6" component="h3" sx={{ fontWeight: 600 }}>
+                <Typography variant="h2" component="h2">
                   Risk suggestions
                 </Typography>
                 <Stack direction="row" spacing={1}>
@@ -1996,7 +1989,7 @@ function RiskDiscoveryContent() {
         PaperProps={{ sx: { width: 480, p: 3 } }}
       >
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>Intelligence sources</Typography>
+          <Typography variant="h3" component="h3">Intelligence sources</Typography>
           <IconButton onClick={() => setSourcesDrawerOpen(false)} size="small"><CloseIcon /></IconButton>
         </Stack>
         <Box sx={{ overflow: 'auto' }}>
@@ -2007,7 +2000,7 @@ function RiskDiscoveryContent() {
               regulatory: { label: 'Regulatory & market trends', accentColor: '#C29A1D' },
             };
             const meta = channelMeta[channelKey];
-            const relevanceColor: Record<string, string> = { high: '#E54E54', medium: '#C29A1D', low: '#2EB365' };
+            const relevanceColor: Record<string, string> = { high: '#94a3b8', medium: '#94a3b8', low: '#94a3b8' };
             return (
               <Box key={channelKey} sx={{ mb: 3 }}>
                 <Typography variant="caption" sx={{ fontWeight: 700, color: meta.accentColor, display: 'block', mb: 1 }}>
